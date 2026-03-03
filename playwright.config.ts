@@ -4,6 +4,12 @@ export default defineConfig({
   testDir: "./e2e",
   timeout: 30_000,
   retries: 0,
+  webServer: {
+    command: "npm run dev -- --port 5173",
+    url: "http://localhost:5173",
+    reuseExistingServer: true,
+    timeout: 30_000,
+  },
   use: {
     baseURL: "http://localhost:5173",
     headless: true,
@@ -12,14 +18,14 @@ export default defineConfig({
     {
       name: "mobile-sm",
       use: {
-        ...devices["iPhone SE"],
+        ...devices["Pixel 5"],
         viewport: { width: 375, height: 812 },
       },
     },
     {
       name: "mobile-lg",
       use: {
-        ...devices["iPhone 14"],
+        ...devices["Pixel 7"],
         viewport: { width: 390, height: 844 },
       },
     },

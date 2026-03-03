@@ -204,6 +204,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             label="🟢 ต้นทาง"
             value={origin}
             onChange={setOrigin}
+            testId="picker-origin"
           />
 
           {/* Swap button */}
@@ -226,6 +227,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             label="🔴 ปลายทาง"
             value={destination}
             onChange={setDestination}
+            testId="picker-destination"
           />
 
           {/* Search button: sticky on mobile, normal on desktop */}

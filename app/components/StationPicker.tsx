@@ -9,6 +9,7 @@ interface StationPickerProps {
   label: string;
   value: Station | null;
   onChange: (station: Station | null) => void;
+  testId?: string;
 }
 
 export function StationPicker({
@@ -19,6 +20,7 @@ export function StationPicker({
   label,
   value,
   onChange,
+  testId,
 }: StationPickerProps) {
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
@@ -111,6 +113,7 @@ export function StationPicker({
       <div
         className="flex items-center border border-gray-300 rounded-lg bg-white cursor-pointer"
         onClick={() => setIsOpen(true)}
+        data-testid={testId}
       >
         {value ? (
           <div className="flex-1 px-3 py-2">

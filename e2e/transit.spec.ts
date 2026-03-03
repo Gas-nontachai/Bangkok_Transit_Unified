@@ -5,12 +5,11 @@ async function waitForAppReady(page: Page) {
   await page.waitForSelector("text=สถานี", { timeout: 15_000 });
 }
 
-// Helper: select a station from StationPicker
-async function selectStation(page: Page, label: string, stationName: string) {
-  const picker = page.locator(`text=${label}`).locator("..").locator("..");
-  await picker.click();
-  await page.waitForSelector('input[placeholder*="ค้นหา"]', { timeout: 5_000 });
-  const input = page.locator('input[placeholder*="ค้นหา"]').first();
+// Helper: open and select a station from StationPicker (testId: "picker-origin" or "picker-destination")
+async function selectStation(page: Page, testId: string, stationName: string) {
+  await page.locator(`[data-testid="${testId}"]`).click();
+  await page.waitForSelector('input[placeholder*="ชื่อไทย"]', { timeout: 5_000 });
+  const input = page.locator('input[placeholder*="ชื่อไทย"]').first();
   await input.fill(stationName);
   await page.waitForSelector(`text=${stationName}`, { timeout: 5_000 });
   await page.locator(`text=${stationName}`).first().click();
@@ -21,8 +20,8 @@ test.describe("Page loads correctly", () => {
     await page.goto("/");
     await waitForAppReady(page);
     await expect(page.locator("text=Bangkok Transit Unified")).toBeVisible();
-    await expect(page.locator("text=ต้นทาง")).toBeVisible();
-    await expect(page.locator("text=ปลายทาง")).toBeVisible();
+    await expect(page.locator("text=🟢 ต้นทาง").first()).toBeVisible();
+    await expect(page.locator("text=🔴 ปลายทาง").first()).toBeVisible();
     await expect(page.locator('[data-testid="search-button"]')).toBeVisible();
   });
 });
@@ -42,8 +41,6 @@ test.describe("Map visibility", () => {
     if (!isMobile) test.skip();
     await page.goto("/");
     await waitForAppReady(page);
-    const fab = page.locator('button[aria-label="สลับสถานีต้นทางและปลายทาง"]');
-    // FAB for map
     const mapFab = page.locator('button:has-text("แผนที่")');
     await expect(mapFab).toBeVisible();
   });
@@ -60,8 +57,8 @@ test.describe("Map visibility", () => {
     await page.locator('button:has-text("แผนที่")').click();
     await expect(page.locator('[data-testid="map-overlay"]')).toBeVisible();
 
-    // Tap ✕ to close
-    await page.locator('button[aria-label="ปิดแผนที่"]').click();
+    // Tap ✕ to close (inside overlay, not the FAB)
+    await page.locator('[data-testid="map-overlay"] button[aria-label="ปิดแผนที่"]').click();
     await expect(page.locator('[data-testid="map-overlay"]')).not.toBeVisible();
   });
 });
@@ -88,25 +85,13 @@ test.describe("Route results", () => {
     await waitForAppReady(page);
 
     // Select หมอชิต → สีลม (known multi-route pair)
-    await page.locator("text=🟢 ต้นทาง").click();
-    await page.waitForTimeout(500);
-    const searchInputs = page.locator('input[placeholder*="ค้นหา"]');
-    await searchInputs.first().fill("หมอชิต");
-    await page.waitForTimeout(500);
-    await page.locator("text=หมอชิต").first().click();
-
-    await page.locator("text=🔴 ปลายทาง").click();
-    await page.waitForTimeout(500);
-    const searchInputs2 = page.locator('input[placeholder*="ค้นหา"]');
-    await searchInputs2.first().fill("สีลม");
-    await page.waitForTimeout(500);
-    await page.locator("text=สีลม").first().click();
+    await selectStation(page, "picker-origin", "หมอชิต");
+    await selectStation(page, "picker-destination", "สีลม");
 
     await page.locator('[data-testid="search-button"]').click();
-    await page.waitForTimeout(1000);
 
     // Should show at least one route option with fare
-    await expect(page.locator("text=เส้นทาง")).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator("text=เส้นทาง").first()).toBeVisible({ timeout: 10_000 });
     await expect(page.locator("text=฿").first()).toBeVisible();
   });
 
@@ -115,23 +100,15 @@ test.describe("Route results", () => {
     await page.goto("/");
     await waitForAppReady(page);
 
-    await page.locator("text=🟢 ต้นทาง").click();
-    await page.waitForTimeout(500);
-    await page.locator('input[placeholder*="ค้นหา"]').first().fill("หมอชิต");
-    await page.waitForTimeout(500);
-    await page.locator("text=หมอชิต").first().click();
-
-    await page.locator("text=🔴 ปลายทาง").click();
-    await page.waitForTimeout(500);
-    await page.locator('input[placeholder*="ค้นหา"]').first().fill("สีลม");
-    await page.waitForTimeout(500);
-    await page.locator("text=สีลม").first().click();
+    await selectStation(page, "picker-origin", "หมอชิต");
+    await selectStation(page, "picker-destination", "สีลม");
 
     await page.locator('[data-testid="search-button"]').click();
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(1000);
 
     // First card auto-expanded: should see ต้นทาง/ปลายทาง labels
     await expect(page.locator("text=ต้นทาง").last()).toBeVisible({ timeout: 10_000 });
     await expect(page.locator("text=ปลายทาง").last()).toBeVisible({ timeout: 10_000 });
   });
 });
+
