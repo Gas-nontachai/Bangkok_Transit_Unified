@@ -6,6 +6,7 @@ export interface FareSegmentResult {
   lineName: string;
   operatorCode: string;
   fare: number;
+  isEstimated: boolean;
   fromStationId: string;
   toStationId: string;
 }
@@ -13,6 +14,33 @@ export interface FareSegmentResult {
 export interface FareResult {
   segments: FareSegmentResult[];
   totalFare: number;
+}
+
+/**
+ * Estimate fare when exact fare matrix lookup fails.
+ * Uses per-line interpolation based on known min/max fares and total stops.
+ */
+function estimateFare(lineCode: string, stops: number): number {
+  if (stops <= 0) return 0;
+  switch (lineCode) {
+    case "SUK": return Math.min(65, Math.round(17 + 48 * stops / 46));
+    case "SIL": return Math.min(65, Math.round(17 + 48 * stops / 13));
+    case "GOLD": return 16;
+    case "BLU": {
+      const tbl = [0, 17, 20, 23, 26, 29, 32, 35, 38, 41, 42];
+      return stops < tbl.length ? tbl[stops] : 42;
+    }
+    case "PUR": return Math.min(42, Math.round(17 + 25 * stops / 15));
+    case "YEL": return Math.min(45, Math.round(15 + 30 * stops / 22));
+    case "PNK": return Math.min(45, Math.round(15 + 30 * stops / 26));
+    case "ARL": {
+      const tbl = [0, 15, 20, 25, 30, 35, 40, 45];
+      return stops < tbl.length ? tbl[stops] : 45;
+    }
+    case "RDD": return Math.min(42, Math.round(12 + 30 * stops / 9));
+    case "RDL": return Math.min(42, Math.round(12 + 30 * stops / 3));
+    default: return Math.round(15 + stops * 2);
+  }
 }
 
 /**
@@ -52,13 +80,17 @@ export function calculateFare(
     const operator = line ? operatorMap.get(line.operator_id) : undefined;
 
     const key = `${segment.lineId}:${fromStationId}:${toStationId}`;
-    let fare = fareLookup.get(key) ?? 0;
+    const exactFare = fareLookup.get(key);
+    const stops = segment.stationIds.length - 1;
+    const isEstimated = exactFare === undefined;
+    const fare = exactFare ?? estimateFare(line?.code ?? "", stops);
 
     fareSegments.push({
       lineId: segment.lineId,
       lineName: line ? line.name_th : "Unknown",
       operatorCode: operator ? operator.code : "Unknown",
       fare,
+      isEstimated,
       fromStationId,
       toStationId,
     });

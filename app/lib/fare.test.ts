@@ -41,12 +41,14 @@ describe("calculateFare", () => {
     expect(result.segments[1].operatorCode).toBe("MRT");
   });
 
-  it("returns 0 fare when fare matrix entry not found", () => {
+  it("returns estimated fare with isEstimated=true when fare matrix entry not found", () => {
     const segments: RouteSegmentRaw[] = [
       { lineId: "L1", stationIds: ["X", "Y", "Z"], isTransfer: false },
     ];
     const result = calculateFare(segments, fareMatrix, lines, operators);
-    expect(result.totalFare).toBe(0);
+    // SUK line, 2 stops: estimated = round(17 + 48 * 2/46) = round(17 + 2.09) = 19
+    expect(result.segments[0].isEstimated).toBe(true);
+    expect(result.totalFare).toBeGreaterThan(0); // uses estimate, not 0
   });
 
   it("handles reverse direction fare lookup", () => {

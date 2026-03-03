@@ -75,7 +75,7 @@ export function findShortestPath(
     if (current.stationId === toStationId) {
       return {
         steps: current.path,
-        totalTimeMin: current.totalTime,
+        totalTimeMin: Math.round(current.totalTime), // strip transfer penalty fractions
         found: true,
       };
     }
@@ -89,7 +89,9 @@ export function findShortestPath(
     const neighbors = graph.get(current.stationId) || [];
     for (const neighbor of neighbors) {
       const neighborKey = neighbor.neighbor;
-      const newTime = current.totalTime + neighbor.travelTimeMin;
+      // Add tiny penalty per line change to prefer fewer transfers when times are equal
+      const isLineChange = neighbor.isTransfer || (current.lineId !== null && neighbor.lineId !== current.lineId && neighbor.lineId !== null);
+      const newTime = current.totalTime + neighbor.travelTimeMin + (isLineChange ? 0.01 : 0);
 
       if (visited.has(neighborKey) && visited.get(neighborKey)! <= newTime) {
         continue;
