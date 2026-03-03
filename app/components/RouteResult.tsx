@@ -115,73 +115,133 @@ function buildJourneyItems(
 
 function SegmentRow({
   item,
-  isLast,
 }: {
   item: Extract<JourneyItem, { type: "segment" }>;
   isLast: boolean;
 }) {
-  const [expanded, setExpanded] = useState(false);
   const stationCount = item.stations.length;
 
   return (
-    <div className="flex gap-2">
+    <div className="flex gap-3">
       {/* Left: color bar */}
-      <div className="flex flex-col items-center">
+      <div className="flex flex-col items-center pt-1">
         <LineColorBar color={item.line.color} />
       </div>
 
       {/* Right: content */}
-      <div className={`flex-1 pb-2 ${isLast ? "" : ""}`}>
-        {/* Line name + time */}
+      <div className="flex-1 pb-3">
+        {/* Line pill + time */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
-            <LineColorDot color={item.line.color} />
-            <span className="text-sm font-semibold text-gray-800">
+            <span
+              className="text-xs font-bold px-2 py-0.5 rounded-full text-white"
+              style={{ backgroundColor: item.line.color }}
+            >
               {item.line.name_th}
             </span>
-            <span className="text-xs text-gray-400">{item.operator?.code}</span>
+            {item.operator?.code && (
+              <span className="text-xs text-gray-400">{item.operator.code}</span>
+            )}
           </div>
-          <span className="text-xs font-semibold text-blue-700">
+          <span className="text-xs font-semibold text-gray-700 bg-gray-100 px-2 py-0.5 rounded-full">
             {item.time} นาที
           </span>
         </div>
-        {/* Station count + expand */}
-        <div className="flex items-center gap-2 mt-0.5">
+        {/* Station count */}
+        <div className="flex items-center gap-2 mt-1">
           <span className="text-xs text-gray-500">{stationCount} สถานี</span>
-          <button
-            onClick={() => setExpanded((v) => !v)}
-            className="text-xs text-blue-500 hover:text-blue-700 transition-colors"
-          >
-            {expanded ? "▲ ซ่อน" : "▼ ดูทุกสถานี"}
-          </button>
         </div>
-        {/* Expanded station list */}
-        {expanded && (
-          <div className="mt-1.5 ml-1 space-y-0.5">
-            {item.stations.map((st, i) => (
-              <div key={st.id} className="flex items-center gap-1.5 py-0.5">
-                <span
-                  className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: item.line.color }}
-                />
-                <span className="text-xs text-gray-700">{st.name_th}</span>
-                <span className="text-xs text-gray-400">{st.name_en}</span>
-                {i === 0 && (
-                  <span className="text-xs text-green-600 font-medium">
-                    ↑
-                  </span>
-                )}
-                {i === item.stations.length - 1 && (
-                  <span className="text-xs text-red-600 font-medium">↓</span>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );
 }
+
+function FullJourneyStationList({ items }: { items: JourneyItem[] }) {
+  return (
+    <div className="mt-2 rounded-xl border border-gray-200 overflow-hidden bg-white">
+      {items.map((item, idx) => {
+        if (item.type === "transfer") {
+          return (
+            <div
+              key={idx}
+              className="flex items-center gap-3 px-3 py-2 bg-amber-50 border-y border-amber-100"
+            >
+              <span className="text-base leading-none">🚶</span>
+              <div className="flex-1 min-w-0">
+                <span className="text-xs text-amber-800 font-semibold">
+                  เดิน {item.walkTime} นาที
+                </span>
+                <span className="text-xs text-gray-400 mx-1">→ ขึ้นสาย</span>
+                <span
+                  className="text-xs font-bold px-2 py-0.5 rounded-full text-white"
+                  style={{ backgroundColor: item.toLine.color }}
+                >
+                  {item.toLine.name_th}
+                </span>
+              </div>
+            </div>
+          );
+        }
+
+        // segment
+        return (
+          <div key={idx}>
+            {/* Line section header */}
+            <div
+              className="flex items-center gap-2 px-3 py-1.5"
+              style={{ backgroundColor: item.line.color + "22" }}
+            >
+              <span
+                className="text-xs font-bold px-2 py-0.5 rounded-full text-white flex-shrink-0"
+                style={{ backgroundColor: item.line.color }}
+              >
+                {item.line.name_th}
+              </span>
+              {item.operator?.code && (
+                <span className="text-xs text-gray-500">{item.operator.code}</span>
+              )}
+              <span className="text-xs text-gray-500 ml-auto">{item.time} นาที · {item.stations.length} สถานี</span>
+            </div>
+
+            {/* Stations */}
+            <div className="divide-y divide-gray-50">
+              {item.stations.map((st, i) => {
+                const isFirst = i === 0;
+                const isLast = i === item.stations.length - 1;
+                const isEndpoint = isFirst || isLast;
+                return (
+                  <div
+                    key={st.id}
+                    className="flex items-center gap-2.5 px-3 py-1.5"
+                    style={isEndpoint ? { backgroundColor: item.line.color + "12" } : {}}
+                  >
+                    {/* Colored dot for this line */}
+                    <span
+                      className={`rounded-full flex-shrink-0 ${isEndpoint ? "w-3 h-3 ring-2" : "w-2 h-2"}`}
+                      style={{
+                        backgroundColor: item.line.color,
+                        ...(isEndpoint ? { ringColor: item.line.color + "44" } : {}),
+                      }}
+                    />
+                    <span
+                      className={`text-xs flex-1 min-w-0 ${isEndpoint ? "font-bold text-gray-900" : "text-gray-700"}`}
+                    >
+                      {st.name_th}
+                    </span>
+                    <span className="text-xs text-gray-400 truncate max-w-[80px]">
+                      {st.name_en}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 
 function TransferRow({
   item,
@@ -189,26 +249,42 @@ function TransferRow({
   item: Extract<JourneyItem, { type: "transfer" }>;
 }) {
   return (
-    <div className="flex gap-2 my-1">
-      {/* Left: icon */}
-      <div className="flex flex-col items-center w-1">
-        <span className="text-base">🚶</span>
+    <div className="flex gap-3 my-1">
+      {/* Left: walk icon centered */}
+      <div className="flex flex-col items-center justify-center w-4 flex-shrink-0">
+        <div className="w-0.5 h-3 bg-gray-200" />
+        <span className="text-sm leading-none">🚶</span>
+        <div className="w-0.5 h-3 bg-gray-200" />
       </div>
-      {/* Right */}
-      <div className="flex-1 flex items-center justify-between bg-orange-50 border border-orange-200 rounded-lg px-2.5 py-1.5 ml-1">
-        <div className="text-xs text-orange-800">
-          <span className="font-semibold">{item.fromStation.name_th}</span>
-          <span className="text-orange-600 mx-1">→</span>
-          <span>เปลี่ยน</span>
+      {/* Right: two-line transfer card */}
+      <div className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+        {/* Line 1: station name */}
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-gray-500">📍 เปลี่ยนสายที่</span>
+          <span className="text-xs font-bold text-gray-900">
+            {item.fromStation.name_th}
+          </span>
+          <span className="text-xs text-gray-400">
+            {item.fromStation.name_en}
+          </span>
+        </div>
+        {/* Line 2: walk time + destination line */}
+        <div className="flex items-center gap-1.5 mt-0.5">
+          <span className="text-xs text-amber-700 font-medium">
+            🚶 เดินประมาณ {item.walkTime} นาที
+          </span>
+          <span className="text-xs text-gray-400">→ ขึ้นสาย</span>
           <span
-            className="inline-block w-2.5 h-2.5 rounded-full mx-1 align-middle"
+            className="inline-block w-2.5 h-2.5 rounded-full flex-shrink-0"
             style={{ backgroundColor: item.toLine.color }}
           />
-          <span className="font-semibold">{item.toLine.name_th}</span>
+          <span
+            className="text-xs font-semibold"
+            style={{ color: item.toLine.color }}
+          >
+            {item.toLine.name_th}
+          </span>
         </div>
-        <span className="text-xs font-semibold text-orange-700 flex-shrink-0 ml-2">
-          🚶 ~{item.walkTime} นาที
-        </span>
       </div>
     </div>
   );
@@ -223,6 +299,8 @@ function JourneyTimeline({
   segments: RouteSegment[];
   totalTime: number;
 }) {
+  const [showAllStations, setShowAllStations] = useState(false);
+
   // Build lineId → operator lookup from all segments (including transfer segments)
   const operatorByLineId = new Map(
     segments.filter((s) => s.operator).map((s) => [s.line.id, s.operator]),
@@ -235,31 +313,28 @@ function JourneyTimeline({
     <div className="space-y-1">
       {/* Origin */}
       {origin && (
-        <div className="flex items-center gap-2 pb-1">
-          <span className="text-green-600 text-base">🟢</span>
-          <div>
+        <div className="flex items-center gap-2 pb-2">
+          <span className="w-4 h-4 rounded-full bg-green-500 flex-shrink-0 ring-2 ring-green-200" />
+          <div className="flex-1 min-w-0">
             <span className="text-sm font-bold text-gray-900">
               {origin.name_th}
             </span>
             <span className="text-xs text-gray-400 ml-1">{origin.name_en}</span>
           </div>
-          <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded ml-auto">
+          <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium flex-shrink-0">
             ต้นทาง
           </span>
         </div>
       )}
 
-      {/* Segments + transfers */}
+      {/* Segments + transfers (summary) */}
       {items.map((item, i) => {
         if (item.type === "segment") {
-          const isLastSeg =
-            i === items.length - 1 ||
-            (i === items.length - 2 && items[i + 1]?.type !== "segment");
           return (
             <SegmentRow
               key={i}
               item={item}
-              isLast={isLastSeg}
+              isLast={i === items.length - 1}
             />
           );
         }
@@ -268,9 +343,9 @@ function JourneyTimeline({
 
       {/* Destination */}
       {destination && (
-        <div className="flex items-center gap-2 pt-1">
-          <span className="text-red-600 text-base">🔴</span>
-          <div>
+        <div className="flex items-center gap-2 pt-2">
+          <span className="w-4 h-4 rounded-full bg-red-500 flex-shrink-0 ring-2 ring-red-200" />
+          <div className="flex-1 min-w-0">
             <span className="text-sm font-bold text-gray-900">
               {destination.name_th}
             </span>
@@ -278,19 +353,29 @@ function JourneyTimeline({
               {destination.name_en}
             </span>
           </div>
-          <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded ml-auto">
+          <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium flex-shrink-0">
             ปลายทาง
           </span>
         </div>
       )}
 
-      {/* Total time summary */}
+      {/* Total time summary + show all stations toggle */}
       <div className="mt-2 pt-2 border-t border-gray-200 flex items-center justify-between">
         <span className="text-xs text-gray-500">เวลาเดินทางรวม</span>
         <span className="text-sm font-bold text-blue-700">
           ⏱ {totalTime} นาที
         </span>
       </div>
+
+      {/* Unified station list toggle */}
+      <button
+        onClick={() => setShowAllStations((v) => !v)}
+        className="w-full text-xs text-blue-500 hover:text-blue-700 transition-colors py-1 text-left"
+      >
+        {showAllStations ? "▲ ซ่อนสถานี" : "▼ ดูทุกสถานี (ทุกสาย)"}
+      </button>
+
+      {showAllStations && <FullJourneyStationList items={items} />}
     </div>
   );
 }
@@ -396,7 +481,7 @@ function RouteOptionCard({
             totalTime={routeResult.total_time_min}
           />
           {/* Fare Breakdown */}
-          <FareBreakdown fareResult={fareResult} />
+          <FareBreakdown fareResult={fareResult} lines={lines} />
         </div>
       )}
     </div>
