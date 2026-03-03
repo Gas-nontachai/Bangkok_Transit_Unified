@@ -19,9 +19,12 @@ import { StationPicker } from "~/components/StationPicker";
 import { RouteResultDisplay } from "~/components/RouteResult";
 import type { FareResult } from "~/lib/fare";
 
+import type { PathStep } from "~/lib/dijkstra";
+
 export interface RouteOption {
   routeResult: RouteResult;
   fareResult: FareResult;
+  pathSteps: PathStep[];
 }
 
 export function meta({}: Route.MetaArgs) {
@@ -86,9 +89,10 @@ export default function Home({ loaderData }: Route.ComponentProps) {
   const [origin, setOrigin] = useState<Station | null>(null);
   const [destination, setDestination] = useState<Station | null>(null);
   const [routeOptions, setRouteOptions] = useState<RouteOption[]>([]);
+  const [activeRouteIndex, setActiveRouteIndex] = useState(0);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
-  const [pathSteps, setPathSteps] = useState<import("~/lib/dijkstra").PathStep[]>([]);
+  const [pathSteps, setPathSteps] = useState<PathStep[]>([]);
 
   // Build adjacency list once
   const graph = useMemo(() => buildAdjacencyList(edges), [edges]);
@@ -103,6 +107,8 @@ export default function Home({ loaderData }: Route.ComponentProps) {
     setOrigin(destination);
     setDestination(origin);
     setRouteOptions([]);
+    setActiveRouteIndex(0);
+    setPathSteps([]);
     setSearchError(null);
   };
 
@@ -123,6 +129,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
 
       // Use the first (fastest) result for map highlighting
       setPathSteps(results[0].steps);
+      setActiveRouteIndex(0);
 
       // Build RouteOption for each alternative
       const options: RouteOption[] = results.map((result) => {
@@ -150,12 +157,15 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         return {
           routeResult: { steps, segments, total_time_min: result.totalTimeMin, total_fare: fare.totalFare },
           fareResult: fare,
+          pathSteps: result.steps,
         };
       });
 
       // Sort by fare ascending (cheapest first)
       options.sort((a, b) => a.fareResult.totalFare - b.fareResult.totalFare);
       setRouteOptions(options);
+      // Map shows cheapest (first after sort) by default
+      setPathSteps(options[0].pathSteps);
     } catch (err) {
       console.error("Route search error:", err);
       setSearchError("เกิดข้อผิดพลาดในการค้นหาเส้นทาง");
@@ -228,6 +238,11 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         <div className="px-4 pb-4">
           <RouteResultDisplay
             routeOptions={routeOptions}
+            activeIndex={activeRouteIndex}
+            onSelectRoute={(idx) => {
+              setActiveRouteIndex(idx);
+              setPathSteps(routeOptions[idx].pathSteps);
+            }}
             stations={stations}
             lines={lines}
             isLoading={isSearching}

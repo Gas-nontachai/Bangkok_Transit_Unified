@@ -1,4 +1,3 @@
-import { useState } from "react";
 import type { RouteResult, Line, Station } from "~/lib/types";
 import { FareBreakdown } from "./FareBreakdown";
 import type { FareResult } from "~/lib/fare";
@@ -6,6 +5,8 @@ import type { RouteOption } from "~/routes/home";
 
 interface RouteResultProps {
   routeOptions: RouteOption[];
+  activeIndex: number;
+  onSelectRoute: (index: number) => void;
   stations: Station[];
   lines: Line[];
   isLoading?: boolean;
@@ -24,14 +25,14 @@ function LineColorDot({ color }: { color: string }) {
 interface RouteOptionCardProps {
   option: RouteOption;
   index: number;
+  isActive: boolean;
   isCheapest: boolean;
   isFastest: boolean;
   lines: Line[];
-  defaultOpen: boolean;
+  onSelect: () => void;
 }
 
-function RouteOptionCard({ option, index, isCheapest, isFastest, lines, defaultOpen }: RouteOptionCardProps) {
-  const [isOpen, setIsOpen] = useState(defaultOpen);
+function RouteOptionCard({ option, index, isActive, isCheapest, isFastest, lines, onSelect }: RouteOptionCardProps) {
   const { routeResult, fareResult } = option;
   const lineMap = new Map(lines.map((l) => [l.id, l]));
 
@@ -42,11 +43,11 @@ function RouteOptionCard({ option, index, isCheapest, isFastest, lines, defaultO
   const transferCount = routeResult.steps.filter((s) => s.is_transfer).length;
 
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden">
+    <div className={`border rounded-lg overflow-hidden transition-colors ${isActive ? "border-blue-400 shadow-sm" : "border-gray-200"}`}>
       {/* Card Header (always visible) */}
       <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between p-3 bg-white hover:bg-gray-50 transition-colors text-left"
+        onClick={onSelect}
+        className={`w-full flex items-center justify-between p-3 transition-colors text-left ${isActive ? "bg-blue-50 hover:bg-blue-100" : "bg-white hover:bg-gray-50"}`}
       >
         <div className="flex items-center gap-3 flex-1 min-w-0">
           {/* Route number */}
@@ -86,11 +87,11 @@ function RouteOptionCard({ option, index, isCheapest, isFastest, lines, defaultO
             )}
           </div>
         </div>
-        <span className="text-gray-400 text-xs ml-2">{isOpen ? "▲" : "▼"}</span>
+        <span className="text-gray-400 text-xs ml-2">{isActive ? "▲" : "▼"}</span>
       </button>
 
       {/* Expandable detail */}
-      {isOpen && (
+      {isActive && (
         <div className="border-t border-gray-100 p-3 space-y-3 bg-gray-50">
           {/* Route Steps */}
           <div className="space-y-1">
@@ -127,6 +128,8 @@ function RouteOptionCard({ option, index, isCheapest, isFastest, lines, defaultO
 
 export function RouteResultDisplay({
   routeOptions,
+  activeIndex,
+  onSelectRoute,
   lines,
   isLoading,
   error,
@@ -172,10 +175,11 @@ export function RouteResultDisplay({
           key={i}
           option={option}
           index={i}
+          isActive={i === activeIndex}
           isCheapest={option.fareResult.totalFare === cheapestFare}
           isFastest={option.routeResult.total_time_min === fastestTime}
           lines={lines}
-          defaultOpen={i === 0}
+          onSelect={() => onSelectRoute(i)}
         />
       ))}
     </div>

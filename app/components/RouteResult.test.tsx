@@ -18,6 +18,8 @@ describe("RouteResultDisplay", () => {
     render(
       <RouteResultDisplay
         routeOptions={[]}
+        activeIndex={0}
+        onSelectRoute={() => {}}
         stations={mockStations}
         lines={mockLines}
       />
@@ -29,6 +31,8 @@ describe("RouteResultDisplay", () => {
     render(
       <RouteResultDisplay
         routeOptions={[]}
+        activeIndex={0}
+        onSelectRoute={() => {}}
         stations={mockStations}
         lines={mockLines}
         isLoading={true}
@@ -41,6 +45,8 @@ describe("RouteResultDisplay", () => {
     render(
       <RouteResultDisplay
         routeOptions={[]}
+        activeIndex={0}
+        onSelectRoute={() => {}}
         stations={mockStations}
         lines={mockLines}
         error="ไม่สามารถเชื่อมต่อได้"
@@ -64,10 +70,13 @@ describe("RouteResultDisplay", () => {
         segments: [{ lineId: "L1", lineName: "สุขุมวิท", operatorCode: "BTS", fare: 17, isEstimated: false, fromStationId: "s1", toStationId: "s2" }],
         totalFare: 17,
       },
+      pathSteps: [],
     };
     render(
       <RouteResultDisplay
         routeOptions={[mockOption]}
+        activeIndex={0}
+        onSelectRoute={() => {}}
         stations={mockStations}
         lines={mockLines}
       />
