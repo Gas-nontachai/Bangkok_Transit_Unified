@@ -17,6 +17,7 @@ import { findAlternativePaths, extractSegments } from "~/lib/dijkstra";
 import { calculateFare } from "~/lib/fare";
 import { StationPicker } from "~/components/StationPicker";
 import { RouteResultDisplay } from "~/components/RouteResult";
+import { MapToggleFAB } from "~/components/MapToggleFAB";
 import type { FareResult } from "~/lib/fare";
 
 import type { PathStep } from "~/lib/dijkstra";
@@ -93,6 +94,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [pathSteps, setPathSteps] = useState<PathStep[]>([]);
+  const [showMap, setShowMap] = useState(false);
 
   // Build adjacency list once
   const graph = useMemo(() => buildAdjacencyList(edges), [edges]);
@@ -175,11 +177,11 @@ export default function Home({ loaderData }: Route.ComponentProps) {
   };
 
   return (
-    <div className="flex flex-col md:flex-row h-screen bg-gray-50">
-      {/* Side Panel */}
-      <div className="w-full md:w-96 md:flex-shrink-0 bg-white shadow-lg overflow-y-auto z-10">
+    <div className="flex flex-col md:flex-row h-[100dvh] bg-gray-50">
+      {/* Side Panel — full screen on mobile, fixed width on desktop */}
+      <div className="w-full md:w-96 md:flex-shrink-0 bg-white md:shadow-lg overflow-y-auto z-10 flex flex-col">
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-700 to-blue-500 text-white p-4">
+        <div className="bg-gradient-to-r from-blue-700 to-blue-500 text-white p-4 flex-shrink-0">
           <h1 className="text-lg font-bold">🚇 Bangkok Transit Unified</h1>
           <p className="text-xs text-blue-100 mt-0.5">
             วางแผนเส้นทางรถไฟฟ้ากรุงเทพฯ ทุกระบบ
@@ -187,13 +189,13 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         </div>
 
         {error && (
-          <div className="m-4 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+          <div className="m-4 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700 flex-shrink-0">
             ⚠️ {error}
           </div>
         )}
 
         {/* Station Pickers */}
-        <div className="p-4 space-y-3">
+        <div className="p-4 space-y-3 flex-shrink-0">
           <StationPicker
             stations={stations}
             lines={lines}
@@ -208,8 +210,9 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           <div className="flex justify-center">
             <button
               onClick={handleSwap}
-              className="p-2 rounded-full hover:bg-gray-100 text-gray-500 transition-colors"
+              className="p-3 rounded-full hover:bg-gray-100 text-gray-500 transition-colors text-lg"
               title="สลับสถานี"
+              aria-label="สลับสถานีต้นทางและปลายทาง"
             >
               ⇅
             </button>
@@ -225,17 +228,21 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             onChange={setDestination}
           />
 
-          <button
-            onClick={handleSearch}
-            disabled={!origin || !destination || isSearching}
-            className="w-full py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {isSearching ? "กำลังค้นหา..." : "🔍 ค้นหาเส้นทาง"}
-          </button>
+          {/* Search button: sticky on mobile, normal on desktop */}
+          <div className="md:block">
+            <button
+              onClick={handleSearch}
+              disabled={!origin || !destination || isSearching}
+              className="w-full py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-base"
+              data-testid="search-button"
+            >
+              {isSearching ? "กำลังค้นหา..." : "🔍 ค้นหาเส้นทาง"}
+            </button>
+          </div>
         </div>
 
-        {/* Route Result */}
-        <div className="px-4 pb-4">
+        {/* Route Result — scrollable on mobile */}
+        <div className="px-4 pb-24 md:pb-4 flex-1 overflow-y-auto">
           <RouteResultDisplay
             routeOptions={routeOptions}
             activeIndex={activeRouteIndex}
@@ -252,14 +259,15 @@ export default function Home({ loaderData }: Route.ComponentProps) {
 
         {/* Stats footer */}
         {stations.length > 0 && (
-          <div className="px-4 pb-4 text-xs text-gray-400 text-center">
+          <div className="px-4 py-2 text-xs text-gray-400 text-center flex-shrink-0 border-t border-gray-100">
             {stations.length} สถานี · {lines.length} สาย · {operators.length} ระบบ
           </div>
         )}
       </div>
 
-      {/* Map Area */}
-      <div className="flex-1 relative">
+      {/* Map Area — hidden on mobile by default, shown as overlay when toggled */}
+      {/* Desktop: normal flex-1 */}
+      <div className="hidden md:flex flex-1 relative">
         <MapWrapper
           stations={stations}
           lines={lines}
@@ -267,6 +275,40 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           routeSteps={pathSteps}
         />
       </div>
+
+      {/* Mobile map overlay */}
+      {showMap && (
+        <div
+          className="md:hidden fixed inset-0 z-50 bg-white flex flex-col"
+          data-testid="map-overlay"
+        >
+          <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200 flex-shrink-0">
+            <span className="font-semibold text-gray-800">🗺️ แผนที่เส้นทาง</span>
+            <button
+              onClick={() => setShowMap(false)}
+              className="p-2 rounded-full hover:bg-gray-100 text-gray-600 text-lg font-bold"
+              aria-label="ปิดแผนที่"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="flex-1 relative">
+            <MapWrapper
+              stations={stations}
+              lines={lines}
+              stationLines={stationLines}
+              routeSteps={pathSteps}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* FAB map toggle (mobile only) */}
+      <MapToggleFAB
+        showMap={showMap}
+        onToggle={() => setShowMap((v) => !v)}
+        hasRoute={routeOptions.length > 0}
+      />
     </div>
   );
 }
