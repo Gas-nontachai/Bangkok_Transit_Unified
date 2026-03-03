@@ -15,7 +15,8 @@ export interface PathResult {
 
 interface QueueItem {
   stationId: string;
-  totalTime: number;
+  totalTime: number;   // penalized time — used only for priority queue ordering
+  actualTime: number;  // real travel time without penalties
   lineId: string | null;
   path: PathStep[];
 }
@@ -23,6 +24,7 @@ interface QueueItem {
 /**
  * Dijkstra's shortest path algorithm for transit routing.
  * transferPenalty is added per line change to break ties in favor of fewer transfers.
+ * The returned totalTimeMin is always the actual travel time, never including penalties.
  */
 function dijkstra(
   graph: AdjacencyList,
@@ -42,6 +44,7 @@ function dijkstra(
   const queue: QueueItem[] = [{
     stationId: fromStationId,
     totalTime: 0,
+    actualTime: 0,
     lineId: null,
     path: [{ stationId: fromStationId, lineId: null, travelTimeMin: 0, isTransfer: false }],
   }];
@@ -54,7 +57,7 @@ function dijkstra(
     const current = queue.splice(minIdx, 1)[0];
 
     if (current.stationId === toStationId) {
-      return { steps: current.path, totalTimeMin: Math.round(current.totalTime), found: true };
+      return { steps: current.path, totalTimeMin: current.actualTime, found: true };
     }
 
     const stateKey = current.stationId;
@@ -66,12 +69,14 @@ function dijkstra(
       const isLineChange = neighbor.isTransfer ||
         (current.lineId !== null && neighbor.lineId !== null && neighbor.lineId !== current.lineId);
       const newTime = current.totalTime + neighbor.travelTimeMin + (isLineChange ? transferPenalty : 0);
+      const newActualTime = current.actualTime + neighbor.travelTimeMin;
 
       if (visited.has(neighborKey) && visited.get(neighborKey)! <= newTime) continue;
 
       queue.push({
         stationId: neighborKey,
         totalTime: newTime,
+        actualTime: newActualTime,
         lineId: neighbor.lineId,
         path: [
           ...current.path,
