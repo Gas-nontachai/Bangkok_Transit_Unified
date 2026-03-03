@@ -1,4 +1,5 @@
-import type { Line, Station } from "~/lib/types";
+import { useState } from "react";
+import type { Line, Station, RouteStep, RouteSegment, Operator } from "~/lib/types";
 import { FareBreakdown } from "./FareBreakdown";
 import type { RouteOption } from "~/routes/home";
 
@@ -18,6 +19,272 @@ function LineColorDot({ color }: { color: string }) {
       className="inline-block w-3 h-3 rounded-full flex-shrink-0"
       style={{ backgroundColor: color }}
     />
+  );
+}
+
+function LineColorBar({ color }: { color: string }) {
+  return (
+    <span
+      className="inline-block w-1 rounded-full self-stretch min-h-[24px]"
+      style={{ backgroundColor: color }}
+    />
+  );
+}
+
+// Derived type representing one item in the journey timeline
+type JourneyItem =
+  | {
+      type: "segment";
+      line: Line;
+      operator: Operator;
+      stations: Station[];
+      time: number;
+      fare: number;
+    }
+  | {
+      type: "transfer";
+      fromStation: Station;
+      toLine: Line;
+      walkTime: number;
+    };
+
+function buildJourneyItems(
+  steps: RouteStep[],
+  segments: RouteSegment[],
+): JourneyItem[] {
+  const items: JourneyItem[] = [];
+
+  // Walk through steps to calculate per-segment time
+  // Group steps between transfer markers into segments
+  let segIdx = 0;
+  let currentSegTime = 0;
+
+  for (let i = 0; i < steps.length; i++) {
+    const step = steps[i];
+    if (step.is_transfer) {
+      // Find the matching real segment and add it
+      const seg = segments[segIdx];
+      if (seg) {
+        items.push({
+          type: "segment",
+          line: seg.line,
+          operator: seg.operator,
+          stations: seg.stations,
+          time: currentSegTime,
+          fare: seg.fare,
+        });
+        segIdx++;
+      }
+      // Add the transfer item
+      const toLine = step.line;
+      const fromStation = steps[i - 1]?.station;
+      if (toLine && fromStation) {
+        // Find next real segment's line (the line we're transferring to)
+        const nextSeg = segments[segIdx];
+        items.push({
+          type: "transfer",
+          fromStation,
+          toLine: nextSeg?.line ?? toLine,
+          walkTime: step.travel_time_min,
+        });
+      }
+      currentSegTime = 0;
+    } else {
+      currentSegTime += step.travel_time_min;
+    }
+  }
+
+  // Push last segment
+  const lastSeg = segments[segIdx];
+  if (lastSeg) {
+    items.push({
+      type: "segment",
+      line: lastSeg.line,
+      operator: lastSeg.operator,
+      stations: lastSeg.stations,
+      time: currentSegTime,
+      fare: lastSeg.fare,
+    });
+  }
+
+  return items;
+}
+
+function SegmentRow({
+  item,
+  isLast,
+}: {
+  item: Extract<JourneyItem, { type: "segment" }>;
+  isLast: boolean;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const stationCount = item.stations.length;
+
+  return (
+    <div className="flex gap-2">
+      {/* Left: color bar */}
+      <div className="flex flex-col items-center">
+        <LineColorBar color={item.line.color} />
+      </div>
+
+      {/* Right: content */}
+      <div className={`flex-1 pb-2 ${isLast ? "" : ""}`}>
+        {/* Line name + time */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <LineColorDot color={item.line.color} />
+            <span className="text-sm font-semibold text-gray-800">
+              {item.line.name_th}
+            </span>
+            <span className="text-xs text-gray-400">{item.operator.code}</span>
+          </div>
+          <span className="text-xs font-semibold text-blue-700">
+            {item.time} นาที
+          </span>
+        </div>
+        {/* Station count + expand */}
+        <div className="flex items-center gap-2 mt-0.5">
+          <span className="text-xs text-gray-500">{stationCount} สถานี</span>
+          <button
+            onClick={() => setExpanded((v) => !v)}
+            className="text-xs text-blue-500 hover:text-blue-700 transition-colors"
+          >
+            {expanded ? "▲ ซ่อน" : "▼ ดูทุกสถานี"}
+          </button>
+        </div>
+        {/* Expanded station list */}
+        {expanded && (
+          <div className="mt-1.5 ml-1 space-y-0.5">
+            {item.stations.map((st, i) => (
+              <div key={st.id} className="flex items-center gap-1.5 py-0.5">
+                <span
+                  className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: item.line.color }}
+                />
+                <span className="text-xs text-gray-700">{st.name_th}</span>
+                <span className="text-xs text-gray-400">{st.name_en}</span>
+                {i === 0 && (
+                  <span className="text-xs text-green-600 font-medium">
+                    ↑
+                  </span>
+                )}
+                {i === item.stations.length - 1 && (
+                  <span className="text-xs text-red-600 font-medium">↓</span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TransferRow({
+  item,
+}: {
+  item: Extract<JourneyItem, { type: "transfer" }>;
+}) {
+  return (
+    <div className="flex gap-2 my-1">
+      {/* Left: icon */}
+      <div className="flex flex-col items-center w-1">
+        <span className="text-base">🚶</span>
+      </div>
+      {/* Right */}
+      <div className="flex-1 flex items-center justify-between bg-orange-50 border border-orange-200 rounded-lg px-2.5 py-1.5 ml-1">
+        <div className="text-xs text-orange-800">
+          <span className="font-semibold">{item.fromStation.name_th}</span>
+          <span className="text-orange-600 mx-1">→</span>
+          <span>เปลี่ยน</span>
+          <span
+            className="inline-block w-2.5 h-2.5 rounded-full mx-1 align-middle"
+            style={{ backgroundColor: item.toLine.color }}
+          />
+          <span className="font-semibold">{item.toLine.name_th}</span>
+        </div>
+        <span className="text-xs font-semibold text-orange-700 flex-shrink-0 ml-2">
+          🚶 ~{item.walkTime} นาที
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function JourneyTimeline({
+  steps,
+  segments,
+  totalTime,
+}: {
+  steps: RouteStep[];
+  segments: RouteSegment[];
+  totalTime: number;
+}) {
+  const items = buildJourneyItems(steps, segments);
+  const origin = steps[0]?.station;
+  const destination = steps[steps.length - 1]?.station;
+
+  return (
+    <div className="space-y-1">
+      {/* Origin */}
+      {origin && (
+        <div className="flex items-center gap-2 pb-1">
+          <span className="text-green-600 text-base">🟢</span>
+          <div>
+            <span className="text-sm font-bold text-gray-900">
+              {origin.name_th}
+            </span>
+            <span className="text-xs text-gray-400 ml-1">{origin.name_en}</span>
+          </div>
+          <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded ml-auto">
+            ต้นทาง
+          </span>
+        </div>
+      )}
+
+      {/* Segments + transfers */}
+      {items.map((item, i) => {
+        if (item.type === "segment") {
+          const isLastSeg =
+            i === items.length - 1 ||
+            (i === items.length - 2 && items[i + 1]?.type !== "segment");
+          return (
+            <SegmentRow
+              key={i}
+              item={item}
+              isLast={isLastSeg}
+            />
+          );
+        }
+        return <TransferRow key={i} item={item} />;
+      })}
+
+      {/* Destination */}
+      {destination && (
+        <div className="flex items-center gap-2 pt-1">
+          <span className="text-red-600 text-base">🔴</span>
+          <div>
+            <span className="text-sm font-bold text-gray-900">
+              {destination.name_th}
+            </span>
+            <span className="text-xs text-gray-400 ml-1">
+              {destination.name_en}
+            </span>
+          </div>
+          <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded ml-auto">
+            ปลายทาง
+          </span>
+        </div>
+      )}
+
+      {/* Total time summary */}
+      <div className="mt-2 pt-2 border-t border-gray-200 flex items-center justify-between">
+        <span className="text-xs text-gray-500">เวลาเดินทางรวม</span>
+        <span className="text-sm font-bold text-blue-700">
+          ⏱ {totalTime} นาที
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -115,52 +382,12 @@ function RouteOptionCard({
       {/* Expandable detail */}
       {isActive && (
         <div className="border-t border-gray-100 p-3 space-y-3 bg-gray-50">
-          {/* Route Steps */}
-          <div className="space-y-1">
-            {routeResult.steps.map((step, i) => {
-              const line = step.line
-                ? lineMap.get(step.line.id) || step.line
-                : null;
-              if (step.is_transfer) {
-                return (
-                  <div
-                    key={i}
-                    className="flex items-center gap-2 py-1 px-2 bg-orange-50 rounded text-xs text-orange-700"
-                  >
-                    <span>🔄</span>
-                    <span>เปลี่ยนสาย → {line?.name_th}</span>
-                  </div>
-                );
-              }
-              return (
-                <div key={i} className="flex items-center gap-2 py-0.5">
-                  {line ? (
-                    <LineColorDot color={line.color} />
-                  ) : (
-                    <span className="w-3 h-3" />
-                  )}
-                  <div className="flex-1">
-                    <span className="text-sm font-medium text-gray-800">
-                      {step.station.name_th}
-                    </span>
-                    <span className="text-xs text-gray-400 ml-1">
-                      {step.station.name_en}
-                    </span>
-                  </div>
-                  {i === 0 && (
-                    <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">
-                      ต้นทาง
-                    </span>
-                  )}
-                  {i === routeResult.steps.length - 1 && (
-                    <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded">
-                      ปลายทาง
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          {/* Journey Timeline */}
+          <JourneyTimeline
+            steps={routeResult.steps}
+            segments={routeResult.segments}
+            totalTime={routeResult.total_time_min}
+          />
           {/* Fare Breakdown */}
           <FareBreakdown fareResult={fareResult} />
         </div>
