@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import type { Route } from "./+types/home";
 import { supabase } from "~/lib/supabase.server";
 import type {
@@ -38,7 +38,10 @@ export function meta({}: Route.MetaArgs) {
   ];
 }
 
-export async function loader({}: Route.LoaderArgs) {
+export async function loader({ request }: Route.LoaderArgs) {
+  const url = new URL(request.url);
+  const initialFromId = url.searchParams.get("from") || null;
+  const initialToId = url.searchParams.get("to") || null;
   try {
     const [
       { data: operators, error: opErr },
@@ -74,6 +77,8 @@ export async function loader({}: Route.LoaderArgs) {
       stationLines: (stationLines as StationLine[]) || [],
       edges: (edges as Edge[]) || [],
       fareMatrix: (fareMatrix as FareMatrix[]) || [],
+      initialFromId,
+      initialToId,
       error: null,
     };
   } catch (err) {
@@ -85,14 +90,25 @@ export async function loader({}: Route.LoaderArgs) {
       stationLines: [],
       edges: [],
       fareMatrix: [],
+      initialFromId: null,
+      initialToId: null,
       error: "ไม่สามารถโหลดข้อมูลได้ กรุณาลองใหม่อีกครั้ง",
     };
   }
 }
 
 export default function Home({ loaderData }: Route.ComponentProps) {
-  const { operators, lines, stations, stationLines, edges, fareMatrix, error } =
-    loaderData;
+  const {
+    operators,
+    lines,
+    stations,
+    stationLines,
+    edges,
+    fareMatrix,
+    initialFromId,
+    initialToId,
+    error,
+  } = loaderData;
 
   const [origin, setOrigin] = useState<Station | null>(null);
   const [destination, setDestination] = useState<Station | null>(null);
@@ -103,6 +119,9 @@ export default function Home({ loaderData }: Route.ComponentProps) {
   const [pathSteps, setPathSteps] = useState<PathStep[]>([]);
   const [showMap, setShowMap] = useState(false);
   const [searchExpanded, setSearchExpanded] = useState(true);
+  const [showSharePanel, setShowSharePanel] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(false);
+  const autoSearchedRef = useRef(false);
 
   // Build adjacency list once
   const graph = useMemo(() => buildAdjacencyList(edges), [edges]);
@@ -113,14 +132,53 @@ export default function Home({ loaderData }: Route.ComponentProps) {
   );
   const lineMap = useMemo(() => new Map(lines.map((l) => [l.id, l])), [lines]);
 
+  // Initialise origin/destination from URL params and auto-search once
+  useEffect(() => {
+    if (!initialFromId || !initialToId || autoSearchedRef.current) return;
+    const from = stationMap.get(initialFromId);
+    const to = stationMap.get(initialToId);
+    if (from && to) {
+      setOrigin(from);
+      setDestination(to);
+      autoSearchedRef.current = true;
+    }
+  }, [initialFromId, initialToId, stationMap]);
+
+  // Auto-search when both stations are set from URL params
+  useEffect(() => {
+    if (
+      autoSearchedRef.current &&
+      origin &&
+      destination &&
+      routeOptions.length === 0 &&
+      !isSearching
+    ) {
+      handleSearch();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [origin, destination]);
+
+  const updateUrl = (from: Station | null, to: Station | null) => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams();
+    if (from) params.set("from", from.id);
+    if (to) params.set("to", to.id);
+    const search = params.toString();
+    window.history.replaceState(null, "", search ? `?${search}` : "/");
+  };
+
   const handleSwap = () => {
-    setOrigin(destination);
-    setDestination(origin);
+    const newOrigin = destination;
+    const newDest = origin;
+    setOrigin(newOrigin);
+    setDestination(newDest);
     setRouteOptions([]);
     setActiveRouteIndex(0);
     setPathSteps([]);
     setSearchError(null);
     setSearchExpanded(true);
+    setShowSharePanel(false);
+    updateUrl(newOrigin, newDest);
   };
 
   const handleSearch = () => {
@@ -189,8 +247,10 @@ export default function Home({ loaderData }: Route.ComponentProps) {
       setRouteOptions(options);
       // Map shows cheapest (first after sort) by default
       setPathSteps(options[0].pathSteps);
-      // Collapse pickers on mobile to give more room to results
+      // Collapse pickers to give more room to results
       setSearchExpanded(false);
+      // Update URL for sharing
+      updateUrl(origin, destination);
     } catch (err) {
       console.error("Route search error:", err);
       setSearchError("เกิดข้อผิดพลาดในการค้นหาเส้นทาง");
@@ -217,9 +277,9 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           </div>
         )}
 
-        {/* Compact search bar — mobile only, shown after search */}
+        {/* Compact search bar — shown after search (mobile + desktop) */}
         {!searchExpanded && routeOptions.length > 0 && (
-          <div className="md:hidden flex items-center gap-2 px-4 py-2 border-b border-gray-100 bg-gray-50 flex-shrink-0">
+          <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-100 bg-gray-50 flex-shrink-0">
             <div className="flex-1 flex items-center gap-1.5 text-sm min-w-0 overflow-hidden">
               <span className="text-green-700 font-semibold truncate max-w-[40%]">
                 🟢 {origin?.name_th}
@@ -239,9 +299,9 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           </div>
         )}
 
-        {/* Station Pickers — hidden on mobile when compact, always visible on desktop */}
+        {/* Station Pickers — hidden when compact */}
         <div
-          className={`p-4 space-y-3 flex-shrink-0 ${!searchExpanded && routeOptions.length > 0 ? "hidden md:block" : ""}`}
+          className={`p-4 space-y-3 flex-shrink-0 ${!searchExpanded && routeOptions.length > 0 ? "hidden" : ""}`}
         >
           <StationPicker
             stations={stations}
@@ -292,6 +352,52 @@ export default function Home({ loaderData }: Route.ComponentProps) {
 
         {/* Route Result — scrollable on mobile */}
         <div className="px-4 pb-24 md:pb-4 flex-1 overflow-y-auto">
+          {/* Share button — shown when results are available */}
+          {routeOptions.length > 0 && (
+            <div className="mb-3">
+              <button
+                onClick={() => setShowSharePanel((v) => !v)}
+                className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 transition-colors"
+                aria-label="แชร์เส้นทาง"
+              >
+                📤 แชร์เส้นทางนี้
+              </button>
+              {showSharePanel && (
+                <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-xs text-gray-500 mb-1.5">ลิงก์สำหรับแชร์</p>
+                  <div className="flex gap-2">
+                    <input
+                      readOnly
+                      value={
+                        typeof window !== "undefined" ? window.location.href : ""
+                      }
+                      className="flex-1 text-xs bg-white border border-gray-300 rounded px-2 py-1.5 text-gray-700 overflow-hidden text-ellipsis"
+                      onFocus={(e) => e.target.select()}
+                    />
+                    <button
+                      onClick={() => {
+                        if (typeof navigator !== "undefined") {
+                          navigator.clipboard
+                            .writeText(window.location.href)
+                            .then(() => {
+                              setCopySuccess(true);
+                              setTimeout(() => setCopySuccess(false), 2000);
+                            });
+                        }
+                      }}
+                      className={`flex-shrink-0 px-3 py-1.5 text-xs rounded font-medium transition-colors ${
+                        copySuccess
+                          ? "bg-green-500 text-white"
+                          : "bg-blue-600 text-white hover:bg-blue-700"
+                      }`}
+                    >
+                      {copySuccess ? "✅ คัดลอกแล้ว!" : "📋 คัดลอก"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
           <RouteResultDisplay
             routeOptions={routeOptions}
             activeIndex={activeRouteIndex}
