@@ -110,5 +110,94 @@ test.describe("Route results", () => {
     await expect(page.locator("text=ต้นทาง").last()).toBeVisible({ timeout: 10_000 });
     await expect(page.locator("text=ปลายทาง").last()).toBeVisible({ timeout: 10_000 });
   });
+
+  test("journey timeline shows segment time (นาที) in expanded card", async ({ page, isMobile }) => {
+    if (isMobile) test.skip();
+    await page.goto("/");
+    await waitForAppReady(page);
+
+    await selectStation(page, "picker-origin", "หมอชิต");
+    await selectStation(page, "picker-destination", "สีลม");
+    await page.locator('[data-testid="search-button"]').click();
+    await page.waitForTimeout(1500);
+
+    // First card is auto-expanded; timeline should show segment time in นาที and a line operator code
+    await expect(page.locator("text=นาที").first()).toBeVisible({ timeout: 10_000 });
+    const hasBts = await page.locator("text=BTS").count();
+    const hasMrt = await page.locator("text=MRT").count();
+    expect(hasBts + hasMrt).toBeGreaterThan(0);
+    // Total time summary row
+    await expect(page.locator("text=เวลาเดินทางรวม").first()).toBeVisible({ timeout: 10_000 });
+  });
+
+  test("journey timeline shows transfer walk time for route with transfer", async ({ page, isMobile }) => {
+    if (isMobile) test.skip();
+    await page.goto("/");
+    await waitForAppReady(page);
+
+    // หมอชิต (BTS) → พระราม 9 (MRT) requires a transfer
+    await selectStation(page, "picker-origin", "หมอชิต");
+    await selectStation(page, "picker-destination", "พระราม 9");
+    await page.locator('[data-testid="search-button"]').click();
+    await page.waitForTimeout(1500);
+
+    // Should show transfer indicator with walk time (~X นาที)
+    await expect(page.locator("text=เปลี่ยน").first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator("text=นาที").first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator("text=เวลาเดินทางรวม").first()).toBeVisible({ timeout: 10_000 });
+  });
+
+  test("compact bar shown on desktop after search", async ({ page, isMobile }) => {
+    if (isMobile) test.skip();
+    await page.goto("/");
+    await waitForAppReady(page);
+
+    await selectStation(page, "picker-origin", "หมอชิต");
+    await selectStation(page, "picker-destination", "สีลม");
+    await page.locator('[data-testid="search-button"]').click();
+    await page.waitForTimeout(1500);
+
+    // Compact bar should appear with ✏️ เปลี่ยน button
+    await expect(page.locator("text=✏️ เปลี่ยน").first()).toBeVisible({ timeout: 10_000 });
+  });
+
+  test("URL has ?from= and ?to= params after search", async ({ page, isMobile }) => {
+    if (isMobile) test.skip();
+    await page.goto("/");
+    await waitForAppReady(page);
+
+    await selectStation(page, "picker-origin", "หมอชิต");
+    await selectStation(page, "picker-destination", "สีลม");
+    await page.locator('[data-testid="search-button"]').click();
+    await page.waitForTimeout(1500);
+
+    const url = page.url();
+    expect(url).toContain("from=");
+    expect(url).toContain("to=");
+  });
+
+  test("share button shows URL panel with copy button", async ({ page, isMobile }) => {
+    if (isMobile) test.skip();
+    await page.goto("/");
+    await waitForAppReady(page);
+
+    await selectStation(page, "picker-origin", "หมอชิต");
+    await selectStation(page, "picker-destination", "สีลม");
+    await page.locator('[data-testid="search-button"]').click();
+    await page.waitForTimeout(1500);
+
+    // Share button should appear
+    const shareBtn = page.locator("text=📤 แชร์เส้นทางนี้").first();
+    await expect(shareBtn).toBeVisible({ timeout: 10_000 });
+
+    // Click to open share panel
+    await shareBtn.click();
+
+    // Copy button and URL input should appear
+    await expect(page.locator("text=📋 คัดลอก").first()).toBeVisible();
+    const input = page.locator("input[readonly]").first();
+    const value = await input.inputValue();
+    expect(value).toContain("from=");
+  });
 });
 
