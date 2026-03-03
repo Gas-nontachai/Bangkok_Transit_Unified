@@ -187,6 +187,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             stations={stations}
             lines={lines}
             stationLines={stationLines}
+            operators={operators}
             label="🟢 ต้นทาง"
             value={origin}
             onChange={setOrigin}
@@ -207,6 +208,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             stations={stations}
             lines={lines}
             stationLines={stationLines}
+            operators={operators}
             label="🔴 ปลายทาง"
             value={destination}
             onChange={setDestination}

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { StationPicker } from "./StationPicker";
-import type { Station, Line, StationLine } from "~/lib/types";
+import type { Station, Line, StationLine, Operator } from "~/lib/types";
 
 const mockStations: Station[] = [
   { id: "s1", name_th: "สยาม", name_en: "Siam", code: "CEN", lat: 13.7453, lng: 100.5342, is_interchange: true },
@@ -11,6 +11,10 @@ const mockStations: Station[] = [
 
 const mockLines: Line[] = [
   { id: "L1", operator_id: "op1", name_th: "สุขุมวิท", name_en: "Sukhumvit", code: "SUK", color: "#00843D" },
+];
+
+const mockOperators: Operator[] = [
+  { id: "op1", name_th: "รถไฟฟ้า BTS", name_en: "Bangkok Mass Transit System", code: "BTS" },
 ];
 
 const mockStationLines: StationLine[] = [
@@ -26,6 +30,7 @@ describe("StationPicker", () => {
         stations={mockStations}
         lines={mockLines}
         stationLines={mockStationLines}
+        operators={mockOperators}
         label="ต้นทาง"
         value={null}
         onChange={() => {}}
@@ -40,6 +45,7 @@ describe("StationPicker", () => {
         stations={mockStations}
         lines={mockLines}
         stationLines={mockStationLines}
+        operators={mockOperators}
         label="ต้นทาง"
         value={null}
         onChange={() => {}}
@@ -54,6 +60,7 @@ describe("StationPicker", () => {
         stations={mockStations}
         lines={mockLines}
         stationLines={mockStationLines}
+        operators={mockOperators}
         label="ต้นทาง"
         value={mockStations[0]}
         onChange={() => {}}
@@ -68,6 +75,7 @@ describe("StationPicker", () => {
         stations={mockStations}
         lines={mockLines}
         stationLines={mockStationLines}
+        operators={mockOperators}
         label="ต้นทาง"
         value={null}
         onChange={() => {}}
@@ -77,3 +85,4 @@ describe("StationPicker", () => {
     expect(screen.getByPlaceholderText("ชื่อไทย, English, หรือรหัส (เช่น E4)")).toBeTruthy();
   });
 });
+
