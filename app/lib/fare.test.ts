@@ -9,13 +9,39 @@ const operators: Operator[] = [
 ];
 
 const lines: Line[] = [
-  { id: "L1", operator_id: "op1", name_th: "สุขุมวิท", name_en: "Sukhumvit", code: "SUK", color: "#00843D" },
-  { id: "L2", operator_id: "op2", name_th: "สีน้ำเงิน", name_en: "Blue", code: "BLU", color: "#1E3A8A" },
+  {
+    id: "L1",
+    operator_id: "op1",
+    name_th: "สุขุมวิท",
+    name_en: "Sukhumvit",
+    code: "SUK",
+    color: "#00843D",
+  },
+  {
+    id: "L2",
+    operator_id: "op2",
+    name_th: "สีน้ำเงิน",
+    name_en: "Blue",
+    code: "BLU",
+    color: "#1E3A8A",
+  },
 ];
 
 const fareMatrix: FareMatrix[] = [
-  { id: "f1", line_id: "L1", from_station_id: "A", to_station_id: "C", fare: 30 },
-  { id: "f2", line_id: "L2", from_station_id: "D", to_station_id: "F", fare: 25 },
+  {
+    id: "f1",
+    line_id: "L1",
+    from_station_id: "A",
+    to_station_id: "C",
+    fare: 30,
+  },
+  {
+    id: "f2",
+    line_id: "L2",
+    from_station_id: "D",
+    to_station_id: "F",
+    fare: 25,
+  },
 ];
 
 describe("calculateFare", () => {

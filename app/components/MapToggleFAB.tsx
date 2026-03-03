@@ -4,7 +4,11 @@ interface MapToggleFABProps {
   hasRoute: boolean;
 }
 
-export function MapToggleFAB({ showMap, onToggle, hasRoute }: MapToggleFABProps) {
+export function MapToggleFAB({
+  showMap,
+  onToggle,
+  hasRoute,
+}: MapToggleFABProps) {
   return (
     <button
       onClick={onToggle}
@@ -13,11 +17,13 @@ export function MapToggleFAB({ showMap, onToggle, hasRoute }: MapToggleFABProps)
         flex items-center gap-2 px-4 py-3 rounded-full shadow-lg
         font-semibold text-sm text-white
         transition-all duration-200 active:scale-95
-        ${showMap
-          ? "bg-gray-700 hover:bg-gray-800"
-          : hasRoute
-          ? "bg-blue-600 hover:bg-blue-700"
-          : "bg-gray-500 hover:bg-gray-600"}
+        ${
+          showMap
+            ? "bg-gray-700 hover:bg-gray-800"
+            : hasRoute
+              ? "bg-blue-600 hover:bg-blue-700"
+              : "bg-gray-500 hover:bg-gray-600"
+        }
       `}
       aria-label={showMap ? "ปิดแผนที่" : "เปิดแผนที่"}
     >

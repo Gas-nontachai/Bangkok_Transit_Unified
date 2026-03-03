@@ -24,7 +24,9 @@ export function StationPicker({
 }: StationPickerProps) {
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
-  const [selectedOperatorCode, setSelectedOperatorCode] = useState<string | null>(null);
+  const [selectedOperatorCode, setSelectedOperatorCode] = useState<
+    string | null
+  >(null);
 
   // Build station -> lines map
   const stationLineMap = useMemo(() => {
@@ -42,7 +44,10 @@ export function StationPicker({
   const operatorLineMap = useMemo(() => {
     const map = new Map<string, Line[]>();
     for (const op of operators) {
-      map.set(op.code, lines.filter((l) => l.operator_id === op.id));
+      map.set(
+        op.code,
+        lines.filter((l) => l.operator_id === op.id),
+      );
     }
     return map;
   }, [operators, lines]);
@@ -70,10 +75,12 @@ export function StationPicker({
   // Grouped result (no query): sections per visible line
   const groupedSections = useMemo(() => {
     if (query.trim()) return null;
-    return visibleLines.map((line) => ({
-      line,
-      stations: lineStationsMap.get(line.id) || [],
-    })).filter((s) => s.stations.length > 0);
+    return visibleLines
+      .map((line) => ({
+        line,
+        stations: lineStationsMap.get(line.id) || [],
+      }))
+      .filter((s) => s.stations.length > 0);
   }, [query, visibleLines, lineStationsMap]);
 
   // Flat search result (with query)
@@ -93,7 +100,7 @@ export function StationPicker({
       (s) =>
         s.name_th.toLowerCase().includes(q) ||
         s.name_en.toLowerCase().includes(q) ||
-        (s.code && s.code.toLowerCase().includes(q))
+        (s.code && s.code.toLowerCase().includes(q)),
     );
   }, [query, stations, selectedOperatorCode, stationLineMap, operators]);
 
@@ -132,9 +139,7 @@ export function StationPicker({
             </div>
           </div>
         ) : (
-          <span className="flex-1 px-3 py-2 text-gray-400">
-            ค้นหาสถานี...
-          </span>
+          <span className="flex-1 px-3 py-2 text-gray-400">ค้นหาสถานี...</span>
         )}
         {value && (
           <button
@@ -183,7 +188,7 @@ export function StationPicker({
                     key={op.id}
                     onClick={() =>
                       setSelectedOperatorCode(
-                        selectedOperatorCode === op.code ? null : op.code
+                        selectedOperatorCode === op.code ? null : op.code,
                       )
                     }
                     className={`text-xs px-2 py-0.5 rounded-full border font-medium transition-colors ${
@@ -211,7 +216,10 @@ export function StationPicker({
                     key={station.id}
                     station={station}
                     lines={stationLines_(station)}
-                    onClick={() => { onChange(station); close(); }}
+                    onClick={() => {
+                      onChange(station);
+                      close();
+                    }}
                   />
                 ))
               )
@@ -232,7 +240,10 @@ export function StationPicker({
                       key={`${line.id}-${station.id}`}
                       station={station}
                       lines={stationLines_(station)}
-                      onClick={() => { onChange(station); close(); }}
+                      onClick={() => {
+                        onChange(station);
+                        close();
+                      }}
                     />
                   ))}
                 </div>

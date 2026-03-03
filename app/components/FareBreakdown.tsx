@@ -15,7 +15,9 @@ export function FareBreakdown({ fareResult }: FareBreakdownProps) {
           <div key={i} className="flex justify-between items-center text-sm">
             <div className="flex items-center gap-2">
               <span className="font-medium text-gray-700">{seg.lineName}</span>
-              <span className="text-xs text-gray-500">({seg.operatorCode})</span>
+              <span className="text-xs text-gray-500">
+                ({seg.operatorCode})
+              </span>
             </div>
             <span className="font-medium text-gray-900">
               {seg.isEstimated ? `~฿${seg.fare}` : `฿${seg.fare}`}
@@ -26,7 +28,8 @@ export function FareBreakdown({ fareResult }: FareBreakdownProps) {
       <div className="mt-3 pt-3 border-t border-gray-200 flex justify-between items-center">
         <span className="font-semibold text-gray-800">รวม</span>
         <span className="text-lg font-bold text-blue-600">
-          {fareResult.segments.some(s => s.isEstimated) ? "~" : ""}฿{fareResult.totalFare}
+          {fareResult.segments.some((s) => s.isEstimated) ? "~" : ""}฿
+          {fareResult.totalFare}
         </span>
       </div>
     </div>

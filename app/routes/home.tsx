@@ -57,7 +57,14 @@ export async function loader({}: Route.LoaderArgs) {
     ]);
 
     if (opErr || lineErr || stErr || slErr || edgeErr || fareErr) {
-      console.error("Loader errors:", { opErr, lineErr, stErr, slErr, edgeErr, fareErr });
+      console.error("Loader errors:", {
+        opErr,
+        lineErr,
+        stErr,
+        slErr,
+        edgeErr,
+        fareErr,
+      });
     }
 
     return {
@@ -102,7 +109,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
 
   const stationMap = useMemo(
     () => new Map(stations.map((s) => [s.id, s])),
-    [stations]
+    [stations],
   );
   const lineMap = useMemo(() => new Map(lines.map((l) => [l.id, l])), [lines]);
 
@@ -140,7 +147,12 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         const steps: RouteStep[] = result.steps.map((step) => {
           const station = stationMap.get(step.stationId)!;
           const line = step.lineId ? lineMap.get(step.lineId) || null : null;
-          return { station, line, is_transfer: step.isTransfer, travel_time_min: step.travelTimeMin };
+          return {
+            station,
+            line,
+            is_transfer: step.isTransfer,
+            travel_time_min: step.travelTimeMin,
+          };
         });
 
         const rawSegments = extractSegments(result.steps);
@@ -153,13 +165,20 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           return {
             line,
             operator,
-            stations: seg.stationIds.map((id) => stationMap.get(id)!).filter(Boolean),
+            stations: seg.stationIds
+              .map((id) => stationMap.get(id)!)
+              .filter(Boolean),
             fare: fareSeg?.fare || 0,
           };
         });
 
         return {
-          routeResult: { steps, segments, total_time_min: result.totalTimeMin, total_fare: fare.totalFare },
+          routeResult: {
+            steps,
+            segments,
+            total_time_min: result.totalTimeMin,
+            total_fare: fare.totalFare,
+          },
           fareResult: fare,
           pathSteps: result.steps,
         };
@@ -202,9 +221,13 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         {!searchExpanded && routeOptions.length > 0 && (
           <div className="md:hidden flex items-center gap-2 px-4 py-2 border-b border-gray-100 bg-gray-50 flex-shrink-0">
             <div className="flex-1 flex items-center gap-1.5 text-sm min-w-0 overflow-hidden">
-              <span className="text-green-700 font-semibold truncate max-w-[40%]">🟢 {origin?.name_th}</span>
+              <span className="text-green-700 font-semibold truncate max-w-[40%]">
+                🟢 {origin?.name_th}
+              </span>
               <span className="text-gray-400 flex-shrink-0">→</span>
-              <span className="text-red-700 font-semibold truncate max-w-[40%]">🔴 {destination?.name_th}</span>
+              <span className="text-red-700 font-semibold truncate max-w-[40%]">
+                🔴 {destination?.name_th}
+              </span>
             </div>
             <button
               onClick={() => setSearchExpanded(true)}
@@ -217,7 +240,9 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         )}
 
         {/* Station Pickers — hidden on mobile when compact, always visible on desktop */}
-        <div className={`p-4 space-y-3 flex-shrink-0 ${!searchExpanded && routeOptions.length > 0 ? "hidden md:block" : ""}`}>
+        <div
+          className={`p-4 space-y-3 flex-shrink-0 ${!searchExpanded && routeOptions.length > 0 ? "hidden md:block" : ""}`}
+        >
           <StationPicker
             stations={stations}
             lines={lines}
@@ -284,7 +309,8 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         {/* Stats footer */}
         {stations.length > 0 && (
           <div className="px-4 py-2 text-xs text-gray-400 text-center flex-shrink-0 border-t border-gray-100">
-            {stations.length} สถานี · {lines.length} สาย · {operators.length} ระบบ
+            {stations.length} สถานี · {lines.length} สาย · {operators.length}{" "}
+            ระบบ
           </div>
         )}
       </div>
@@ -307,7 +333,9 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           data-testid="map-overlay"
         >
           <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200 flex-shrink-0">
-            <span className="font-semibold text-gray-800">🗺️ แผนที่เส้นทาง</span>
+            <span className="font-semibold text-gray-800">
+              🗺️ แผนที่เส้นทาง
+            </span>
             <button
               onClick={() => setShowMap(false)}
               className="p-2 rounded-full hover:bg-gray-100 text-gray-600 text-lg font-bold"
@@ -381,4 +409,3 @@ function MapWrapper({
     />
   );
 }
-

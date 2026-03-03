@@ -28,11 +28,26 @@ vi.mock("leaflet", () => ({
 }));
 
 const mockStations: Station[] = [
-  { id: "s1", name_th: "สยาม", name_en: "Siam", code: "CEN", lat: 13.7453, lng: 100.5342, is_interchange: true },
+  {
+    id: "s1",
+    name_th: "สยาม",
+    name_en: "Siam",
+    code: "CEN",
+    lat: 13.7453,
+    lng: 100.5342,
+    is_interchange: true,
+  },
 ];
 
 const mockLines: Line[] = [
-  { id: "L1", operator_id: "op1", name_th: "สุขุมวิท", name_en: "Sukhumvit", code: "SUK", color: "#00843D" },
+  {
+    id: "L1",
+    operator_id: "op1",
+    name_th: "สุขุมวิท",
+    name_en: "Sukhumvit",
+    code: "SUK",
+    color: "#00843D",
+  },
 ];
 
 const mockStationLines: StationLine[] = [
@@ -46,7 +61,7 @@ describe("TransitMap", () => {
         stations={mockStations}
         lines={mockLines}
         stationLines={mockStationLines}
-      />
+      />,
     );
     expect(container.querySelector(".min-h-\\[400px\\]")).toBeTruthy();
   });

@@ -1,15 +1,54 @@
 import { describe, it, expect } from "vitest";
-import { findShortestPath, findAlternativePaths, extractSegments } from "./dijkstra";
+import {
+  findShortestPath,
+  findAlternativePaths,
+  extractSegments,
+} from "./dijkstra";
 import { buildAdjacencyList } from "./graph";
 import type { Edge } from "./types";
 
 // Mock edges: A-B-C on L1, C-D (transfer), D-E-F on L2
 const mockEdges: Edge[] = [
-  { id: "e1", from_station_id: "A", to_station_id: "B", line_id: "L1", travel_time_min: 2, is_transfer: false },
-  { id: "e2", from_station_id: "B", to_station_id: "C", line_id: "L1", travel_time_min: 3, is_transfer: false },
-  { id: "e3", from_station_id: "C", to_station_id: "D", line_id: "TRANSFER", travel_time_min: 5, is_transfer: true },
-  { id: "e4", from_station_id: "D", to_station_id: "E", line_id: "L2", travel_time_min: 2, is_transfer: false },
-  { id: "e5", from_station_id: "E", to_station_id: "F", line_id: "L2", travel_time_min: 4, is_transfer: false },
+  {
+    id: "e1",
+    from_station_id: "A",
+    to_station_id: "B",
+    line_id: "L1",
+    travel_time_min: 2,
+    is_transfer: false,
+  },
+  {
+    id: "e2",
+    from_station_id: "B",
+    to_station_id: "C",
+    line_id: "L1",
+    travel_time_min: 3,
+    is_transfer: false,
+  },
+  {
+    id: "e3",
+    from_station_id: "C",
+    to_station_id: "D",
+    line_id: "TRANSFER",
+    travel_time_min: 5,
+    is_transfer: true,
+  },
+  {
+    id: "e4",
+    from_station_id: "D",
+    to_station_id: "E",
+    line_id: "L2",
+    travel_time_min: 2,
+    is_transfer: false,
+  },
+  {
+    id: "e5",
+    from_station_id: "E",
+    to_station_id: "F",
+    line_id: "L2",
+    travel_time_min: 4,
+    is_transfer: false,
+  },
 ];
 
 describe("findShortestPath", () => {
@@ -48,7 +87,14 @@ describe("findShortestPath", () => {
     const extraEdges: Edge[] = [
       ...mockEdges,
       // Shortcut A -> D directly with higher time
-      { id: "e6", from_station_id: "A", to_station_id: "D", line_id: "L3", travel_time_min: 20, is_transfer: true },
+      {
+        id: "e6",
+        from_station_id: "A",
+        to_station_id: "D",
+        line_id: "L3",
+        travel_time_min: 20,
+        is_transfer: true,
+      },
     ];
     const graph = buildAdjacencyList(extraEdges);
     const result = findShortestPath(graph, "A", "F");
@@ -96,7 +142,9 @@ describe("findAlternativePaths", () => {
     const graph = buildAdjacencyList(mockEdges);
     const results = findAlternativePaths(graph, "A", "F");
     for (let i = 1; i < results.length; i++) {
-      expect(results[i].totalTimeMin).toBeGreaterThanOrEqual(results[i - 1].totalTimeMin);
+      expect(results[i].totalTimeMin).toBeGreaterThanOrEqual(
+        results[i - 1].totalTimeMin,
+      );
     }
   });
 

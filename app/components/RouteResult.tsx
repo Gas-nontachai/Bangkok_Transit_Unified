@@ -1,6 +1,5 @@
-import type { RouteResult, Line, Station } from "~/lib/types";
+import type { Line, Station } from "~/lib/types";
 import { FareBreakdown } from "./FareBreakdown";
-import type { FareResult } from "~/lib/fare";
 import type { RouteOption } from "~/routes/home";
 
 interface RouteResultProps {
@@ -32,18 +31,32 @@ interface RouteOptionCardProps {
   onSelect: () => void;
 }
 
-function RouteOptionCard({ option, index, isActive, isCheapest, isFastest, lines, onSelect }: RouteOptionCardProps) {
+function RouteOptionCard({
+  option,
+  index,
+  isActive,
+  isCheapest,
+  isFastest,
+  lines,
+  onSelect,
+}: RouteOptionCardProps) {
   const { routeResult, fareResult } = option;
   const lineMap = new Map(lines.map((l) => [l.id, l]));
 
   // Get unique lines used (non-transfer steps only)
-  const usedLineIds = [...new Set(
-    routeResult.steps.filter((s) => s.line && !s.is_transfer).map((s) => s.line!.id)
-  )];
+  const usedLineIds = [
+    ...new Set(
+      routeResult.steps
+        .filter((s) => s.line && !s.is_transfer)
+        .map((s) => s.line!.id),
+    ),
+  ];
   const transferCount = routeResult.steps.filter((s) => s.is_transfer).length;
 
   return (
-    <div className={`border rounded-lg overflow-hidden transition-colors ${isActive ? "border-blue-400 shadow-sm" : "border-gray-200"}`}>
+    <div
+      className={`border rounded-lg overflow-hidden transition-colors ${isActive ? "border-blue-400 shadow-sm" : "border-gray-200"}`}
+    >
       {/* Card Header (always visible) */}
       <button
         onClick={onSelect}
@@ -51,21 +64,28 @@ function RouteOptionCard({ option, index, isActive, isCheapest, isFastest, lines
       >
         <div className="flex items-center gap-3 flex-1 min-w-0">
           {/* Route number */}
-          <span className="text-xs font-bold text-gray-500 w-5 flex-shrink-0">#{index + 1}</span>
+          <span className="text-xs font-bold text-gray-500 w-5 flex-shrink-0">
+            #{index + 1}
+          </span>
           {/* Line dots */}
           <div className="flex items-center gap-1 flex-shrink-0">
             {usedLineIds.map((lid) => {
               const line = lineMap.get(lid);
-              return line ? <LineColorDot key={lid} color={line.color} /> : null;
+              return line ? (
+                <LineColorDot key={lid} color={line.color} />
+              ) : null;
             })}
           </div>
           {/* Fare + time */}
           <div className="flex items-center gap-2 text-sm">
             <span className="font-bold text-gray-900">
-              {fareResult.segments.some((s) => s.isEstimated) ? "~" : ""}฿{fareResult.totalFare}
+              {fareResult.segments.some((s) => s.isEstimated) ? "~" : ""}฿
+              {fareResult.totalFare}
             </span>
             <span className="text-gray-400">·</span>
-            <span className="text-gray-600">{routeResult.total_time_min} นาที</span>
+            <span className="text-gray-600">
+              {routeResult.total_time_min} นาที
+            </span>
             {transferCount > 0 && (
               <>
                 <span className="text-gray-400">·</span>
@@ -87,7 +107,9 @@ function RouteOptionCard({ option, index, isActive, isCheapest, isFastest, lines
             )}
           </div>
         </div>
-        <span className="text-gray-400 text-xs ml-2">{isActive ? "▲" : "▼"}</span>
+        <span className="text-gray-400 text-xs ml-2">
+          {isActive ? "▲" : "▼"}
+        </span>
       </button>
 
       {/* Expandable detail */}
@@ -96,10 +118,15 @@ function RouteOptionCard({ option, index, isActive, isCheapest, isFastest, lines
           {/* Route Steps */}
           <div className="space-y-1">
             {routeResult.steps.map((step, i) => {
-              const line = step.line ? lineMap.get(step.line.id) || step.line : null;
+              const line = step.line
+                ? lineMap.get(step.line.id) || step.line
+                : null;
               if (step.is_transfer) {
                 return (
-                  <div key={i} className="flex items-center gap-2 py-1 px-2 bg-orange-50 rounded text-xs text-orange-700">
+                  <div
+                    key={i}
+                    className="flex items-center gap-2 py-1 px-2 bg-orange-50 rounded text-xs text-orange-700"
+                  >
                     <span>🔄</span>
                     <span>เปลี่ยนสาย → {line?.name_th}</span>
                   </div>
@@ -107,13 +134,29 @@ function RouteOptionCard({ option, index, isActive, isCheapest, isFastest, lines
               }
               return (
                 <div key={i} className="flex items-center gap-2 py-0.5">
-                  {line ? <LineColorDot color={line.color} /> : <span className="w-3 h-3" />}
+                  {line ? (
+                    <LineColorDot color={line.color} />
+                  ) : (
+                    <span className="w-3 h-3" />
+                  )}
                   <div className="flex-1">
-                    <span className="text-sm font-medium text-gray-800">{step.station.name_th}</span>
-                    <span className="text-xs text-gray-400 ml-1">{step.station.name_en}</span>
+                    <span className="text-sm font-medium text-gray-800">
+                      {step.station.name_th}
+                    </span>
+                    <span className="text-xs text-gray-400 ml-1">
+                      {step.station.name_en}
+                    </span>
                   </div>
-                  {i === 0 && <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">ต้นทาง</span>}
-                  {i === routeResult.steps.length - 1 && <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded">ปลายทาง</span>}
+                  {i === 0 && (
+                    <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">
+                      ต้นทาง
+                    </span>
+                  )}
+                  {i === routeResult.steps.length - 1 && (
+                    <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded">
+                      ปลายทาง
+                    </span>
+                  )}
                 </div>
               );
             })}
@@ -163,12 +206,15 @@ export function RouteResultDisplay({
 
   // Cheapest = first (sorted by fare), fastest = lowest time
   const cheapestFare = routeOptions[0].fareResult.totalFare;
-  const fastestTime = Math.min(...routeOptions.map((o) => o.routeResult.total_time_min));
+  const fastestTime = Math.min(
+    ...routeOptions.map((o) => o.routeResult.total_time_min),
+  );
 
   return (
     <div className="space-y-2">
       <h3 className="font-semibold text-gray-800 text-sm">
-        🚇 เส้นทาง {routeOptions.length > 1 ? `(${routeOptions.length} ตัวเลือก)` : ""}
+        🚇 เส้นทาง{" "}
+        {routeOptions.length > 1 ? `(${routeOptions.length} ตัวเลือก)` : ""}
       </h3>
       {routeOptions.map((option, i) => (
         <RouteOptionCard

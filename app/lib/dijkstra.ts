@@ -15,8 +15,8 @@ export interface PathResult {
 
 interface QueueItem {
   stationId: string;
-  totalTime: number;   // penalized time — used only for priority queue ordering
-  actualTime: number;  // real travel time without penalties
+  totalTime: number; // penalized time — used only for priority queue ordering
+  actualTime: number; // real travel time without penalties
   lineId: string | null;
   path: PathStep[];
 }
@@ -30,24 +30,40 @@ function dijkstra(
   graph: AdjacencyList,
   fromStationId: string,
   toStationId: string,
-  transferPenalty: number
+  transferPenalty: number,
 ): PathResult {
   if (fromStationId === toStationId) {
     return {
-      steps: [{ stationId: fromStationId, lineId: null, travelTimeMin: 0, isTransfer: false }],
+      steps: [
+        {
+          stationId: fromStationId,
+          lineId: null,
+          travelTimeMin: 0,
+          isTransfer: false,
+        },
+      ],
       totalTimeMin: 0,
       found: true,
     };
   }
 
   const visited = new Map<string, number>();
-  const queue: QueueItem[] = [{
-    stationId: fromStationId,
-    totalTime: 0,
-    actualTime: 0,
-    lineId: null,
-    path: [{ stationId: fromStationId, lineId: null, travelTimeMin: 0, isTransfer: false }],
-  }];
+  const queue: QueueItem[] = [
+    {
+      stationId: fromStationId,
+      totalTime: 0,
+      actualTime: 0,
+      lineId: null,
+      path: [
+        {
+          stationId: fromStationId,
+          lineId: null,
+          travelTimeMin: 0,
+          isTransfer: false,
+        },
+      ],
+    },
+  ];
 
   while (queue.length > 0) {
     let minIdx = 0;
@@ -57,21 +73,33 @@ function dijkstra(
     const current = queue.splice(minIdx, 1)[0];
 
     if (current.stationId === toStationId) {
-      return { steps: current.path, totalTimeMin: current.actualTime, found: true };
+      return {
+        steps: current.path,
+        totalTimeMin: current.actualTime,
+        found: true,
+      };
     }
 
     const stateKey = current.stationId;
-    if (visited.has(stateKey) && visited.get(stateKey)! <= current.totalTime) continue;
+    if (visited.has(stateKey) && visited.get(stateKey)! <= current.totalTime)
+      continue;
     visited.set(stateKey, current.totalTime);
 
     for (const neighbor of graph.get(current.stationId) || []) {
       const neighborKey = neighbor.neighbor;
-      const isLineChange = neighbor.isTransfer ||
-        (current.lineId !== null && neighbor.lineId !== null && neighbor.lineId !== current.lineId);
-      const newTime = current.totalTime + neighbor.travelTimeMin + (isLineChange ? transferPenalty : 0);
+      const isLineChange =
+        neighbor.isTransfer ||
+        (current.lineId !== null &&
+          neighbor.lineId !== null &&
+          neighbor.lineId !== current.lineId);
+      const newTime =
+        current.totalTime +
+        neighbor.travelTimeMin +
+        (isLineChange ? transferPenalty : 0);
       const newActualTime = current.actualTime + neighbor.travelTimeMin;
 
-      if (visited.has(neighborKey) && visited.get(neighborKey)! <= newTime) continue;
+      if (visited.has(neighborKey) && visited.get(neighborKey)! <= newTime)
+        continue;
 
       queue.push({
         stationId: neighborKey,
@@ -80,7 +108,12 @@ function dijkstra(
         lineId: neighbor.lineId,
         path: [
           ...current.path,
-          { stationId: neighborKey, lineId: neighbor.lineId, travelTimeMin: neighbor.travelTimeMin, isTransfer: neighbor.isTransfer },
+          {
+            stationId: neighborKey,
+            lineId: neighbor.lineId,
+            travelTimeMin: neighbor.travelTimeMin,
+            isTransfer: neighbor.isTransfer,
+          },
         ],
       });
     }
@@ -91,7 +124,14 @@ function dijkstra(
 
 /** Get a deduplication key for a route: sorted unique line IDs used (ignoring transfers). */
 function routeKey(steps: PathStep[]): string {
-  const lines = new Set(steps.map((s) => s.lineId).filter((l): l is string => l !== null && !steps.find((s) => s.lineId === l && s.isTransfer)));
+  const lines = new Set(
+    steps
+      .map((s) => s.lineId)
+      .filter(
+        (l): l is string =>
+          l !== null && !steps.find((s) => s.lineId === l && s.isTransfer),
+      ),
+  );
   return [...lines].sort().join(",");
 }
 
@@ -102,7 +142,7 @@ function routeKey(steps: PathStep[]): string {
 export function findAlternativePaths(
   graph: AdjacencyList,
   fromStationId: string,
-  toStationId: string
+  toStationId: string,
 ): PathResult[] {
   // Three variants: fastest, fewest-transfers, balanced
   const penalties = [0.01, 1000, 0.5];
@@ -131,7 +171,7 @@ export function findAlternativePaths(
 export function findShortestPath(
   graph: AdjacencyList,
   fromStationId: string,
-  toStationId: string
+  toStationId: string,
 ): PathResult {
   return dijkstra(graph, fromStationId, toStationId, 0.01);
 }
@@ -159,11 +199,18 @@ export function extractSegments(steps: PathStep[]): RouteSegmentRaw[] {
     if (step.isTransfer) {
       // End current segment and add transfer
       if (currentLineId !== null) {
-        segments.push({ lineId: currentLineId, stationIds: [...currentStations], isTransfer: false });
+        segments.push({
+          lineId: currentLineId,
+          stationIds: [...currentStations],
+          isTransfer: false,
+        });
       }
       segments.push({
         lineId: step.lineId || "",
-        stationIds: [currentStations[currentStations.length - 1], step.stationId],
+        stationIds: [
+          currentStations[currentStations.length - 1],
+          step.stationId,
+        ],
         isTransfer: true,
       });
       currentStations = [step.stationId];
@@ -171,7 +218,11 @@ export function extractSegments(steps: PathStep[]): RouteSegmentRaw[] {
     } else if (step.lineId !== null && step.lineId !== currentLineId) {
       // Line change
       if (currentLineId !== null && currentStations.length > 1) {
-        segments.push({ lineId: currentLineId, stationIds: [...currentStations], isTransfer: false });
+        segments.push({
+          lineId: currentLineId,
+          stationIds: [...currentStations],
+          isTransfer: false,
+        });
         currentStations = [currentStations[currentStations.length - 1]];
       }
       currentLineId = step.lineId;
@@ -183,11 +234,12 @@ export function extractSegments(steps: PathStep[]): RouteSegmentRaw[] {
   }
 
   if (currentLineId !== null && currentStations.length > 1) {
-    segments.push({ lineId: currentLineId, stationIds: [...currentStations], isTransfer: false });
+    segments.push({
+      lineId: currentLineId,
+      stationIds: [...currentStations],
+      isTransfer: false,
+    });
   }
 
   return segments.filter((s) => !s.isTransfer);
 }
-
-
-
