@@ -36,7 +36,7 @@ type JourneyItem =
   | {
       type: "segment";
       line: Line;
-      operator: Operator;
+      operator: Operator | null;
       stations: Station[];
       time: number;
       fare: number;
@@ -50,60 +50,63 @@ type JourneyItem =
 
 function buildJourneyItems(
   steps: RouteStep[],
-  segments: RouteSegment[],
+  operatorByLineId: Map<string, Operator>,
 ): JourneyItem[] {
   const items: JourneyItem[] = [];
 
-  // Walk through steps to calculate per-segment time
-  // Group steps between transfer markers into segments
-  let segIdx = 0;
-  let currentSegTime = 0;
+  let currentLine: Line | null = null;
+  let currentOperator: Operator | null = null;
+  let currentStations: Station[] = [];
+  let currentTime = 0;
 
   for (let i = 0; i < steps.length; i++) {
     const step = steps[i];
+
     if (step.is_transfer) {
-      // Find the matching real segment and add it
-      const seg = segments[segIdx];
-      if (seg) {
+      // Flush current transit segment
+      if (currentLine && currentStations.length > 0) {
         items.push({
           type: "segment",
-          line: seg.line,
-          operator: seg.operator,
-          stations: seg.stations,
-          time: currentSegTime,
-          fare: seg.fare,
+          line: currentLine,
+          operator: currentOperator!,
+          stations: [...currentStations],
+          time: currentTime,
+          fare: 0, // fare shown in FareBreakdown below, not here
         });
-        segIdx++;
       }
-      // Add the transfer item
-      const toLine = step.line;
+      // Add transfer item — step.line is the line we're switching TO
       const fromStation = steps[i - 1]?.station;
-      if (toLine && fromStation) {
-        // Find next real segment's line (the line we're transferring to)
-        const nextSeg = segments[segIdx];
+      if (fromStation && step.line) {
         items.push({
           type: "transfer",
           fromStation,
-          toLine: nextSeg?.line ?? toLine,
+          toLine: step.line,
           walkTime: step.travel_time_min,
         });
       }
-      currentSegTime = 0;
+      currentLine = null;
+      currentOperator = null;
+      currentStations = [];
+      currentTime = 0;
     } else {
-      currentSegTime += step.travel_time_min;
+      if (step.line) {
+        currentLine = step.line;
+        currentOperator = operatorByLineId.get(step.line.id) ?? null;
+      }
+      currentStations.push(step.station);
+      currentTime += step.travel_time_min;
     }
   }
 
-  // Push last segment
-  const lastSeg = segments[segIdx];
-  if (lastSeg) {
+  // Flush last transit segment
+  if (currentLine && currentStations.length > 0) {
     items.push({
       type: "segment",
-      line: lastSeg.line,
-      operator: lastSeg.operator,
-      stations: lastSeg.stations,
-      time: currentSegTime,
-      fare: lastSeg.fare,
+      line: currentLine,
+      operator: currentOperator!,
+      stations: [...currentStations],
+      time: currentTime,
+      fare: 0,
     });
   }
 
@@ -136,7 +139,7 @@ function SegmentRow({
             <span className="text-sm font-semibold text-gray-800">
               {item.line.name_th}
             </span>
-            <span className="text-xs text-gray-400">{item.operator.code}</span>
+            <span className="text-xs text-gray-400">{item.operator?.code}</span>
           </div>
           <span className="text-xs font-semibold text-blue-700">
             {item.time} นาที
@@ -220,7 +223,11 @@ function JourneyTimeline({
   segments: RouteSegment[];
   totalTime: number;
 }) {
-  const items = buildJourneyItems(steps, segments);
+  // Build lineId → operator lookup from all segments (including transfer segments)
+  const operatorByLineId = new Map(
+    segments.filter((s) => s.operator).map((s) => [s.line.id, s.operator]),
+  );
+  const items = buildJourneyItems(steps, operatorByLineId);
   const origin = steps[0]?.station;
   const destination = steps[steps.length - 1]?.station;
 
