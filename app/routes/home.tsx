@@ -13,11 +13,16 @@ import type {
   RouteSegment,
 } from "~/lib/types";
 import { buildAdjacencyList } from "~/lib/graph";
-import { findShortestPath, extractSegments } from "~/lib/dijkstra";
+import { findAlternativePaths, extractSegments } from "~/lib/dijkstra";
 import { calculateFare } from "~/lib/fare";
 import { StationPicker } from "~/components/StationPicker";
 import { RouteResultDisplay } from "~/components/RouteResult";
 import type { FareResult } from "~/lib/fare";
+
+export interface RouteOption {
+  routeResult: RouteResult;
+  fareResult: FareResult;
+}
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -80,8 +85,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
 
   const [origin, setOrigin] = useState<Station | null>(null);
   const [destination, setDestination] = useState<Station | null>(null);
-  const [routeResult, setRouteResult] = useState<RouteResult | null>(null);
-  const [fareResult, setFareResult] = useState<FareResult | null>(null);
+  const [routeOptions, setRouteOptions] = useState<RouteOption[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [pathSteps, setPathSteps] = useState<import("~/lib/dijkstra").PathStep[]>([]);
@@ -98,8 +102,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
   const handleSwap = () => {
     setOrigin(destination);
     setDestination(origin);
-    setRouteResult(null);
-    setFareResult(null);
+    setRouteOptions([]);
     setSearchError(null);
   };
 
@@ -109,52 +112,50 @@ export default function Home({ loaderData }: Route.ComponentProps) {
     setSearchError(null);
 
     try {
-      const result = findShortestPath(graph, origin.id, destination.id);
+      const results = findAlternativePaths(graph, origin.id, destination.id);
 
-      if (!result.found) {
+      if (results.length === 0) {
         setSearchError("ไม่พบเส้นทางที่เชื่อมสถานีนี้");
-        setRouteResult(null);
-        setFareResult(null);
+        setRouteOptions([]);
         setPathSteps([]);
         return;
       }
 
-      setPathSteps(result.steps);
+      // Use the first (fastest) result for map highlighting
+      setPathSteps(results[0].steps);
 
-      // Build RouteResult for display
-      const steps: RouteStep[] = result.steps.map((step) => {
-        const station = stationMap.get(step.stationId)!;
-        const line = step.lineId ? lineMap.get(step.lineId) || null : null;
+      // Build RouteOption for each alternative
+      const options: RouteOption[] = results.map((result) => {
+        const steps: RouteStep[] = result.steps.map((step) => {
+          const station = stationMap.get(step.stationId)!;
+          const line = step.lineId ? lineMap.get(step.lineId) || null : null;
+          return { station, line, is_transfer: step.isTransfer, travel_time_min: step.travelTimeMin };
+        });
+
+        const rawSegments = extractSegments(result.steps);
+        const fare = calculateFare(rawSegments, fareMatrix, lines, operators);
+
+        const segments: RouteSegment[] = rawSegments.map((seg) => {
+          const line = lineMap.get(seg.lineId)!;
+          const operator = operators.find((o) => o.id === line?.operator_id)!;
+          const fareSeg = fare.segments.find((f) => f.lineId === seg.lineId);
+          return {
+            line,
+            operator,
+            stations: seg.stationIds.map((id) => stationMap.get(id)!).filter(Boolean),
+            fare: fareSeg?.fare || 0,
+          };
+        });
+
         return {
-          station,
-          line,
-          is_transfer: step.isTransfer,
-          travel_time_min: step.travelTimeMin,
+          routeResult: { steps, segments, total_time_min: result.totalTimeMin, total_fare: fare.totalFare },
+          fareResult: fare,
         };
       });
 
-      const rawSegments = extractSegments(result.steps);
-      const fare = calculateFare(rawSegments, fareMatrix, lines, operators);
-
-      const segments: RouteSegment[] = rawSegments.map((seg) => {
-        const line = lineMap.get(seg.lineId)!;
-        const operator = operators.find((o) => o.id === line?.operator_id)!;
-        const fareSeg = fare.segments.find((f) => f.lineId === seg.lineId);
-        return {
-          line,
-          operator,
-          stations: seg.stationIds.map((id) => stationMap.get(id)!).filter(Boolean),
-          fare: fareSeg?.fare || 0,
-        };
-      });
-
-      setRouteResult({
-        steps,
-        segments,
-        total_time_min: result.totalTimeMin,
-        total_fare: fare.totalFare,
-      });
-      setFareResult(fare);
+      // Sort by fare ascending (cheapest first)
+      options.sort((a, b) => a.fareResult.totalFare - b.fareResult.totalFare);
+      setRouteOptions(options);
     } catch (err) {
       console.error("Route search error:", err);
       setSearchError("เกิดข้อผิดพลาดในการค้นหาเส้นทาง");
@@ -226,8 +227,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         {/* Route Result */}
         <div className="px-4 pb-4">
           <RouteResultDisplay
-            routeResult={routeResult}
-            fareResult={fareResult}
+            routeOptions={routeOptions}
             stations={stations}
             lines={lines}
             isLoading={isSearching}

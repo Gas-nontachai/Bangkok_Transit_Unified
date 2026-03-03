@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { findShortestPath, extractSegments } from "./dijkstra";
+import { findShortestPath, findAlternativePaths, extractSegments } from "./dijkstra";
 import { buildAdjacencyList } from "./graph";
 import type { Edge } from "./types";
 
@@ -75,5 +75,34 @@ describe("extractSegments", () => {
     const lineIds = segments.map((s) => s.lineId);
     expect(lineIds).toContain("L1");
     expect(lineIds).toContain("L2");
+  });
+});
+
+describe("findAlternativePaths", () => {
+  it("returns at least one route for a valid journey", () => {
+    const graph = buildAdjacencyList(mockEdges);
+    const results = findAlternativePaths(graph, "A", "F");
+    expect(results.length).toBeGreaterThanOrEqual(1);
+    expect(results.every((r) => r.found)).toBe(true);
+  });
+
+  it("returns empty array when no path exists", () => {
+    const graph = buildAdjacencyList(mockEdges);
+    const results = findAlternativePaths(graph, "A", "UNKNOWN");
+    expect(results).toHaveLength(0);
+  });
+
+  it("returns results sorted by totalTimeMin ascending", () => {
+    const graph = buildAdjacencyList(mockEdges);
+    const results = findAlternativePaths(graph, "A", "F");
+    for (let i = 1; i < results.length; i++) {
+      expect(results[i].totalTimeMin).toBeGreaterThanOrEqual(results[i - 1].totalTimeMin);
+    }
+  });
+
+  it("returns at most 3 deduplicated routes", () => {
+    const graph = buildAdjacencyList(mockEdges);
+    const results = findAlternativePaths(graph, "A", "F");
+    expect(results.length).toBeLessThanOrEqual(3);
   });
 });

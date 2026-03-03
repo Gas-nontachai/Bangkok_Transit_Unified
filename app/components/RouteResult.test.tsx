@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { RouteResultDisplay } from "./RouteResult";
 import type { Station, Line, RouteResult } from "~/lib/types";
+import type { RouteOption } from "~/routes/home";
 
 const mockStations: Station[] = [
   { id: "s1", name_th: "สยาม", name_en: "Siam", code: "CEN", lat: 13.7453, lng: 100.5342, is_interchange: true },
@@ -13,11 +14,10 @@ const mockLines: Line[] = [
 ];
 
 describe("RouteResultDisplay", () => {
-  it("shows empty state when no result", () => {
+  it("shows empty state when no options", () => {
     render(
       <RouteResultDisplay
-        routeResult={null}
-        fareResult={null}
+        routeOptions={[]}
         stations={mockStations}
         lines={mockLines}
       />
@@ -28,8 +28,7 @@ describe("RouteResultDisplay", () => {
   it("shows loading state", () => {
     render(
       <RouteResultDisplay
-        routeResult={null}
-        fareResult={null}
+        routeOptions={[]}
         stations={mockStations}
         lines={mockLines}
         isLoading={true}
@@ -41,8 +40,7 @@ describe("RouteResultDisplay", () => {
   it("shows error state", () => {
     render(
       <RouteResultDisplay
-        routeResult={null}
-        fareResult={null}
+        routeOptions={[]}
         stations={mockStations}
         lines={mockLines}
         error="ไม่สามารถเชื่อมต่อได้"
@@ -51,21 +49,31 @@ describe("RouteResultDisplay", () => {
     expect(screen.getByText(/ไม่สามารถเชื่อมต่อได้/)).toBeTruthy();
   });
 
-  it("shows no-path state when steps is empty", () => {
-    const emptyRoute: RouteResult = {
-      steps: [],
-      segments: [],
-      total_time_min: 0,
-      total_fare: 0,
+  it("shows route cards when options provided", () => {
+    const mockOption: RouteOption = {
+      routeResult: {
+        steps: [
+          { station: mockStations[0], line: mockLines[0], is_transfer: false, travel_time_min: 0 },
+          { station: mockStations[1], line: mockLines[0], is_transfer: false, travel_time_min: 5 },
+        ],
+        segments: [],
+        total_time_min: 5,
+        total_fare: 17,
+      },
+      fareResult: {
+        segments: [{ lineId: "L1", lineName: "สุขุมวิท", operatorCode: "BTS", fare: 17, isEstimated: false, fromStationId: "s1", toStationId: "s2" }],
+        totalFare: 17,
+      },
     };
     render(
       <RouteResultDisplay
-        routeResult={emptyRoute}
-        fareResult={null}
+        routeOptions={[mockOption]}
         stations={mockStations}
         lines={mockLines}
       />
     );
-    expect(screen.getByText(/ไม่พบเส้นทาง/)).toBeTruthy();
+    expect(screen.getByText(/เส้นทาง/)).toBeTruthy();
+    expect(screen.getAllByText(/฿17/).length).toBeGreaterThanOrEqual(1);
   });
 });
+

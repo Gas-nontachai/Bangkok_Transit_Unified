@@ -22,6 +22,105 @@ interface QueueItem {
 
 /**
  * Dijkstra's shortest path algorithm for transit routing.
+ * transferPenalty is added per line change to break ties in favor of fewer transfers.
+ */
+function dijkstra(
+  graph: AdjacencyList,
+  fromStationId: string,
+  toStationId: string,
+  transferPenalty: number
+): PathResult {
+  if (fromStationId === toStationId) {
+    return {
+      steps: [{ stationId: fromStationId, lineId: null, travelTimeMin: 0, isTransfer: false }],
+      totalTimeMin: 0,
+      found: true,
+    };
+  }
+
+  const visited = new Map<string, number>();
+  const queue: QueueItem[] = [{
+    stationId: fromStationId,
+    totalTime: 0,
+    lineId: null,
+    path: [{ stationId: fromStationId, lineId: null, travelTimeMin: 0, isTransfer: false }],
+  }];
+
+  while (queue.length > 0) {
+    let minIdx = 0;
+    for (let i = 1; i < queue.length; i++) {
+      if (queue[i].totalTime < queue[minIdx].totalTime) minIdx = i;
+    }
+    const current = queue.splice(minIdx, 1)[0];
+
+    if (current.stationId === toStationId) {
+      return { steps: current.path, totalTimeMin: Math.round(current.totalTime), found: true };
+    }
+
+    const stateKey = current.stationId;
+    if (visited.has(stateKey) && visited.get(stateKey)! <= current.totalTime) continue;
+    visited.set(stateKey, current.totalTime);
+
+    for (const neighbor of graph.get(current.stationId) || []) {
+      const neighborKey = neighbor.neighbor;
+      const isLineChange = neighbor.isTransfer ||
+        (current.lineId !== null && neighbor.lineId !== null && neighbor.lineId !== current.lineId);
+      const newTime = current.totalTime + neighbor.travelTimeMin + (isLineChange ? transferPenalty : 0);
+
+      if (visited.has(neighborKey) && visited.get(neighborKey)! <= newTime) continue;
+
+      queue.push({
+        stationId: neighborKey,
+        totalTime: newTime,
+        lineId: neighbor.lineId,
+        path: [
+          ...current.path,
+          { stationId: neighborKey, lineId: neighbor.lineId, travelTimeMin: neighbor.travelTimeMin, isTransfer: neighbor.isTransfer },
+        ],
+      });
+    }
+  }
+
+  return { steps: [], totalTimeMin: 0, found: false };
+}
+
+/** Get a deduplication key for a route: sorted unique line IDs used (ignoring transfers). */
+function routeKey(steps: PathStep[]): string {
+  const lines = new Set(steps.map((s) => s.lineId).filter((l): l is string => l !== null && !steps.find((s) => s.lineId === l && s.isTransfer)));
+  return [...lines].sort().join(",");
+}
+
+/**
+ * Find up to 3 alternative routes by running Dijkstra with different transfer penalties.
+ * Results are deduplicated (by line usage) and returned sorted by totalTimeMin ascending.
+ */
+export function findAlternativePaths(
+  graph: AdjacencyList,
+  fromStationId: string,
+  toStationId: string
+): PathResult[] {
+  // Three variants: fastest, fewest-transfers, balanced
+  const penalties = [0.01, 1000, 0.5];
+  const seen = new Set<string>();
+  const results: PathResult[] = [];
+
+  for (const penalty of penalties) {
+    const result = dijkstra(graph, fromStationId, toStationId, penalty);
+    if (!result.found) continue;
+    const key = routeKey(result.steps);
+    if (!seen.has(key)) {
+      seen.add(key);
+      results.push(result);
+    }
+  }
+
+  // Sort by total time ascending
+  results.sort((a, b) => a.totalTimeMin - b.totalTimeMin);
+  return results;
+}
+
+/**
+ * Dijkstra's shortest path algorithm for transit routing.
  * Returns the path with minimum travel time (including transfer time).
  */
 export function findShortestPath(
@@ -29,94 +128,7 @@ export function findShortestPath(
   fromStationId: string,
   toStationId: string
 ): PathResult {
-  if (fromStationId === toStationId) {
-    return {
-      steps: [
-        {
-          stationId: fromStationId,
-          lineId: null,
-          travelTimeMin: 0,
-          isTransfer: false,
-        },
-      ],
-      totalTimeMin: 0,
-      found: true,
-    };
-  }
-
-  // Priority queue: [totalTime, stationId, lineId, path]
-  const visited = new Map<string, number>(); // stationId -> best time
-  const queue: QueueItem[] = [
-    {
-      stationId: fromStationId,
-      totalTime: 0,
-      lineId: null,
-      path: [
-        {
-          stationId: fromStationId,
-          lineId: null,
-          travelTimeMin: 0,
-          isTransfer: false,
-        },
-      ],
-    },
-  ];
-
-  while (queue.length > 0) {
-    // Get item with minimum total time (simple linear scan - sufficient for ~200 nodes)
-    let minIdx = 0;
-    for (let i = 1; i < queue.length; i++) {
-      if (queue[i].totalTime < queue[minIdx].totalTime) {
-        minIdx = i;
-      }
-    }
-    const current = queue.splice(minIdx, 1)[0];
-
-    if (current.stationId === toStationId) {
-      return {
-        steps: current.path,
-        totalTimeMin: Math.round(current.totalTime), // strip transfer penalty fractions
-        found: true,
-      };
-    }
-
-    const stateKey = current.stationId;
-    if (visited.has(stateKey) && visited.get(stateKey)! <= current.totalTime) {
-      continue;
-    }
-    visited.set(stateKey, current.totalTime);
-
-    const neighbors = graph.get(current.stationId) || [];
-    for (const neighbor of neighbors) {
-      const neighborKey = neighbor.neighbor;
-      // Add tiny penalty per line change to prefer fewer transfers when times are equal
-      const isLineChange = neighbor.isTransfer || (current.lineId !== null && neighbor.lineId !== current.lineId && neighbor.lineId !== null);
-      const newTime = current.totalTime + neighbor.travelTimeMin + (isLineChange ? 0.01 : 0);
-
-      if (visited.has(neighborKey) && visited.get(neighborKey)! <= newTime) {
-        continue;
-      }
-
-      const newPath: PathStep[] = [
-        ...current.path,
-        {
-          stationId: neighbor.neighbor,
-          lineId: neighbor.lineId,
-          travelTimeMin: neighbor.travelTimeMin,
-          isTransfer: neighbor.isTransfer,
-        },
-      ];
-
-      queue.push({
-        stationId: neighbor.neighbor,
-        totalTime: newTime,
-        lineId: neighbor.lineId,
-        path: newPath,
-      });
-    }
-  }
-
-  return { steps: [], totalTimeMin: 0, found: false };
+  return dijkstra(graph, fromStationId, toStationId, 0.01);
 }
 
 /**
@@ -142,13 +154,8 @@ export function extractSegments(steps: PathStep[]): RouteSegmentRaw[] {
     if (step.isTransfer) {
       // End current segment and add transfer
       if (currentLineId !== null) {
-        segments.push({
-          lineId: currentLineId,
-          stationIds: [...currentStations],
-          isTransfer: false,
-        });
+        segments.push({ lineId: currentLineId, stationIds: [...currentStations], isTransfer: false });
       }
-      // Transfer segment (walking between stations)
       segments.push({
         lineId: step.lineId || "",
         stationIds: [currentStations[currentStations.length - 1], step.stationId],
@@ -159,11 +166,7 @@ export function extractSegments(steps: PathStep[]): RouteSegmentRaw[] {
     } else if (step.lineId !== null && step.lineId !== currentLineId) {
       // Line change
       if (currentLineId !== null && currentStations.length > 1) {
-        segments.push({
-          lineId: currentLineId,
-          stationIds: [...currentStations],
-          isTransfer: false,
-        });
+        segments.push({ lineId: currentLineId, stationIds: [...currentStations], isTransfer: false });
         currentStations = [currentStations[currentStations.length - 1]];
       }
       currentLineId = step.lineId;
@@ -175,12 +178,11 @@ export function extractSegments(steps: PathStep[]): RouteSegmentRaw[] {
   }
 
   if (currentLineId !== null && currentStations.length > 1) {
-    segments.push({
-      lineId: currentLineId,
-      stationIds: [...currentStations],
-      isTransfer: false,
-    });
+    segments.push({ lineId: currentLineId, stationIds: [...currentStations], isTransfer: false });
   }
 
   return segments.filter((s) => !s.isTransfer);
 }
+
+
+
