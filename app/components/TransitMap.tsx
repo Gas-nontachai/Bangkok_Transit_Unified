@@ -145,32 +145,36 @@ export function TransitMap({
       }
       flushPolyline();
 
-      // Highlight origin and destination markers
+      // Highlight origin and destination markers (tracked for cleanup)
       const originStation = stations.find((s) => s.id === routeSteps[0].stationId);
       const destStation = stations.find((s) => s.id === routeSteps[routeSteps.length - 1].stationId);
 
       if (originStation) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (L as any).circleMarker([originStation.lat, originStation.lng], {
+        const m = (L as any).circleMarker([originStation.lat, originStation.lng], {
           radius: 10,
           fillColor: "#22c55e",
           color: "#ffffff",
           weight: 2,
           fillOpacity: 1,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        }).addTo(mapInstance as any).bindPopup(`<b>ต้นทาง: ${originStation.name_th}</b>`);
+        }).addTo(mapInstance as any)
+          .bindTooltip(`🟢 ${originStation.name_th}`, { permanent: true, direction: "top", offset: [0, -8] });
+        polylineRef.current.push(m);
       }
 
       if (destStation) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (L as any).circleMarker([destStation.lat, destStation.lng], {
+        const m = (L as any).circleMarker([destStation.lat, destStation.lng], {
           radius: 10,
           fillColor: "#ef4444",
           color: "#ffffff",
           weight: 2,
           fillOpacity: 1,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        }).addTo(mapInstance as any).bindPopup(`<b>ปลายทาง: ${destStation.name_th}</b>`);
+        }).addTo(mapInstance as any)
+          .bindTooltip(`🔴 ${destStation.name_th}`, { permanent: true, direction: "top", offset: [0, -8] });
+        polylineRef.current.push(m);
       }
 
       // Fit bounds to route

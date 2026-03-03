@@ -95,6 +95,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
   const [searchError, setSearchError] = useState<string | null>(null);
   const [pathSteps, setPathSteps] = useState<PathStep[]>([]);
   const [showMap, setShowMap] = useState(false);
+  const [searchExpanded, setSearchExpanded] = useState(true);
 
   // Build adjacency list once
   const graph = useMemo(() => buildAdjacencyList(edges), [edges]);
@@ -112,6 +113,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
     setActiveRouteIndex(0);
     setPathSteps([]);
     setSearchError(null);
+    setSearchExpanded(true);
   };
 
   const handleSearch = () => {
@@ -168,6 +170,8 @@ export default function Home({ loaderData }: Route.ComponentProps) {
       setRouteOptions(options);
       // Map shows cheapest (first after sort) by default
       setPathSteps(options[0].pathSteps);
+      // Collapse pickers on mobile to give more room to results
+      setSearchExpanded(false);
     } catch (err) {
       console.error("Route search error:", err);
       setSearchError("เกิดข้อผิดพลาดในการค้นหาเส้นทาง");
@@ -194,8 +198,26 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           </div>
         )}
 
-        {/* Station Pickers */}
-        <div className="p-4 space-y-3 flex-shrink-0">
+        {/* Compact search bar — mobile only, shown after search */}
+        {!searchExpanded && routeOptions.length > 0 && (
+          <div className="md:hidden flex items-center gap-2 px-4 py-2 border-b border-gray-100 bg-gray-50 flex-shrink-0">
+            <div className="flex-1 flex items-center gap-1.5 text-sm min-w-0 overflow-hidden">
+              <span className="text-green-700 font-semibold truncate max-w-[40%]">🟢 {origin?.name_th}</span>
+              <span className="text-gray-400 flex-shrink-0">→</span>
+              <span className="text-red-700 font-semibold truncate max-w-[40%]">🔴 {destination?.name_th}</span>
+            </div>
+            <button
+              onClick={() => setSearchExpanded(true)}
+              className="flex-shrink-0 px-3 py-1.5 text-xs text-blue-600 border border-blue-200 rounded-full hover:bg-blue-50 transition-colors"
+              aria-label="เปลี่ยนสถานี"
+            >
+              ✏️ เปลี่ยน
+            </button>
+          </div>
+        )}
+
+        {/* Station Pickers — hidden on mobile when compact, always visible on desktop */}
+        <div className={`p-4 space-y-3 flex-shrink-0 ${!searchExpanded && routeOptions.length > 0 ? "hidden md:block" : ""}`}>
           <StationPicker
             stations={stations}
             lines={lines}
@@ -230,7 +252,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             testId="picker-destination"
           />
 
-          {/* Search button: sticky on mobile, normal on desktop */}
+          {/* Search button */}
           <div className="md:block">
             <button
               onClick={handleSearch}
