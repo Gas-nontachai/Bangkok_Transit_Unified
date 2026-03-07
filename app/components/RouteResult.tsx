@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { Line, Station, RouteStep, RouteSegment, Operator } from "~/lib/types";
-import { FareBreakdown } from "./FareBreakdown";
+import type { FareResult } from "~/lib/fare";
 import type { RouteOption } from "~/routes/home";
 
 interface RouteResultProps {
@@ -89,6 +89,24 @@ function buildJourneyItems(
       currentStations = [];
       currentTime = 0;
     } else {
+      // Detect line change at same station (e.g., Siam: Silom→Sukhumvit, Phaya Thai: Sukhumvit→ARL)
+      if (step.line && currentLine && step.line.id !== currentLine.id) {
+        // Flush current segment
+        if (currentStations.length > 0) {
+          items.push({
+            type: "segment",
+            line: currentLine,
+            operator: currentOperator!,
+            stations: [...currentStations],
+            time: currentTime,
+            fare: 0,
+          });
+        }
+        // Start new segment — carry last station as the first of the new segment
+        const lastStation = currentStations[currentStations.length - 1];
+        currentStations = lastStation ? [lastStation] : [];
+        currentTime = 0;
+      }
       if (step.line) {
         currentLine = step.line;
         currentOperator = operatorByLineId.get(step.line.id) ?? null;
@@ -115,9 +133,13 @@ function buildJourneyItems(
 
 function SegmentRow({
   item,
+  fare,
+  isEstimated,
 }: {
   item: Extract<JourneyItem, { type: "segment" }>;
   isLast: boolean;
+  fare?: number;
+  isEstimated?: boolean;
 }) {
   const stationCount = item.stations.length;
 
@@ -130,7 +152,7 @@ function SegmentRow({
 
       {/* Right: content */}
       <div className="flex-1 pb-3">
-        {/* Line pill + time */}
+        {/* Line pill + time + fare */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
             <span
@@ -143,9 +165,16 @@ function SegmentRow({
               <span className="text-xs text-gray-400">{item.operator.code}</span>
             )}
           </div>
-          <span className="text-xs font-semibold text-gray-700 bg-gray-100 px-2 py-0.5 rounded-full">
-            {item.time} นาที
-          </span>
+          <div className="flex items-center gap-2">
+            {fare !== undefined && fare > 0 && (
+              <span className="text-xs font-semibold text-gray-800">
+                {isEstimated ? "~" : ""}฿{fare}
+              </span>
+            )}
+            <span className="text-xs font-semibold text-gray-700 bg-gray-100 px-2 py-0.5 rounded-full">
+              {item.time} นาที
+            </span>
+          </div>
         </div>
         {/* Station count */}
         <div className="flex items-center gap-2 mt-1">
@@ -204,7 +233,7 @@ function FullJourneyStationList({ items }: { items: JourneyItem[] }) {
             </div>
 
             {/* Stations */}
-            <div className="divide-y divide-gray-50">
+            <div>
               {item.stations.map((st, i) => {
                 const isFirst = i === 0;
                 const isLast = i === item.stations.length - 1;
@@ -212,25 +241,47 @@ function FullJourneyStationList({ items }: { items: JourneyItem[] }) {
                 return (
                   <div
                     key={st.id}
-                    className="flex items-center gap-2.5 px-3 py-1.5"
+                    className="flex gap-2.5 px-3"
                     style={isEndpoint ? { backgroundColor: item.line.color + "12" } : {}}
                   >
-                    {/* Colored dot for this line */}
-                    <span
-                      className={`rounded-full flex-shrink-0 ${isEndpoint ? "w-3 h-3 ring-2" : "w-2 h-2"}`}
-                      style={{
-                        backgroundColor: item.line.color,
-                        ...(isEndpoint ? { ringColor: item.line.color + "44" } : {}),
-                      }}
-                    />
-                    <span
-                      className={`text-xs flex-1 min-w-0 ${isEndpoint ? "font-bold text-gray-900" : "text-gray-700"}`}
-                    >
-                      {st.name_th}
-                    </span>
-                    <span className="text-xs text-gray-400 truncate max-w-[80px]">
-                      {st.name_en}
-                    </span>
+                    {/* Left: colored dot + connecting vertical line */}
+                    <div className="flex flex-col items-center flex-shrink-0" style={{ width: 14 }}>
+                      {/* Top connector line */}
+                      {!isFirst && (
+                        <div
+                          className="w-[3px] flex-1"
+                          style={{ backgroundColor: item.line.color, opacity: 0.5 }}
+                        />
+                      )}
+                      {isFirst && <div className="flex-1" />}
+                      {/* Dot */}
+                      <span
+                        className={`rounded-full flex-shrink-0 ${isEndpoint ? "w-3.5 h-3.5 ring-2" : "w-2.5 h-2.5"}`}
+                        style={{
+                          backgroundColor: item.line.color,
+                          ...(isEndpoint ? { ringColor: item.line.color + "44" } : {}),
+                        }}
+                      />
+                      {/* Bottom connector line */}
+                      {!isLast && (
+                        <div
+                          className="w-[3px] flex-1"
+                          style={{ backgroundColor: item.line.color, opacity: 0.5 }}
+                        />
+                      )}
+                      {isLast && <div className="flex-1" />}
+                    </div>
+                    {/* Right: station info */}
+                    <div className={`flex items-center gap-1 flex-1 min-w-0 ${isEndpoint ? "py-2" : "py-1.5"}`}>
+                      <span
+                        className={`text-xs flex-1 min-w-0 ${isEndpoint ? "font-bold text-gray-900" : "text-gray-700"}`}
+                      >
+                        {st.name_th}
+                      </span>
+                      <span className="text-xs text-gray-400 truncate max-w-[80px]">
+                        {st.name_en}
+                      </span>
+                    </div>
                   </div>
                 );
               })}
@@ -294,10 +345,12 @@ function JourneyTimeline({
   steps,
   segments,
   totalTime,
+  fareResult,
 }: {
   steps: RouteStep[];
   segments: RouteSegment[];
   totalTime: number;
+  fareResult?: FareResult;
 }) {
   const [showAllStations, setShowAllStations] = useState(false);
 
@@ -306,6 +359,14 @@ function JourneyTimeline({
     segments.filter((s) => s.operator).map((s) => [s.line.id, s.operator]),
   );
   const items = buildJourneyItems(steps, operatorByLineId);
+
+  // Build fare lookup by lineId for matching segments
+  const fareByLineId = new Map<string, { fare: number; isEstimated: boolean }>();
+  if (fareResult) {
+    for (const fs of fareResult.segments) {
+      fareByLineId.set(fs.lineId, { fare: fs.fare, isEstimated: fs.isEstimated });
+    }
+  }
   const origin = steps[0]?.station;
   const destination = steps[steps.length - 1]?.station;
 
@@ -330,11 +391,14 @@ function JourneyTimeline({
       {/* Segments + transfers (summary) */}
       {items.map((item, i) => {
         if (item.type === "segment") {
+          const fareInfo = fareByLineId.get(item.line.id);
           return (
             <SegmentRow
               key={i}
               item={item}
               isLast={i === items.length - 1}
+              fare={fareInfo?.fare}
+              isEstimated={fareInfo?.isEstimated}
             />
           );
         }
@@ -359,12 +423,22 @@ function JourneyTimeline({
         </div>
       )}
 
-      {/* Total time summary + show all stations toggle */}
-      <div className="mt-2 pt-2 border-t border-gray-200 flex items-center justify-between">
-        <span className="text-xs text-gray-500">เวลาเดินทางรวม</span>
-        <span className="text-sm font-bold text-blue-700">
-          ⏱ {totalTime} นาที
-        </span>
+      {/* Total time + total fare summary */}
+      <div className="mt-2 pt-2 border-t border-gray-200 space-y-1">
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-gray-500">เวลาเดินทางรวม</span>
+          <span className="text-sm font-bold text-blue-700">
+            ⏱ {totalTime} นาที
+          </span>
+        </div>
+        {fareResult && (
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-gray-500">💰 ค่าโดยสารรวม</span>
+            <span className="text-sm font-bold text-green-700">
+              {fareResult.segments.some((s) => s.isEstimated) ? "~" : ""}฿{fareResult.totalFare}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Unified station list toggle */}
@@ -388,6 +462,9 @@ interface RouteOptionCardProps {
   isFastest: boolean;
   lines: Line[];
   onSelect: () => void;
+  fareSaving?: number;
+  timeSaving?: number;
+  routeCount: number;
 }
 
 function RouteOptionCard({
@@ -398,6 +475,9 @@ function RouteOptionCard({
   isFastest,
   lines,
   onSelect,
+  fareSaving,
+  timeSaving,
+  routeCount,
 }: RouteOptionCardProps) {
   const { routeResult, fareResult } = option;
   const lineMap = new Map(lines.map((l) => [l.id, l]));
@@ -454,14 +534,19 @@ function RouteOptionCard({
           </div>
           {/* Badges */}
           <div className="flex gap-1">
-            {isCheapest && (
+            {routeCount > 1 && isCheapest && isFastest && (
               <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium">
-                🏷️ ถูกสุด
+                🏷️ ถูก+เร็วสุด
               </span>
             )}
-            {isFastest && !isCheapest && (
+            {routeCount > 1 && isCheapest && !isFastest && (
+              <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium">
+                🏷️ ถูกกว่า ฿{fareSaving}
+              </span>
+            )}
+            {routeCount > 1 && isFastest && !isCheapest && (
               <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-medium">
-                ⚡ เร็วสุด
+                ⚡ เร็วกว่า {timeSaving} นาที
               </span>
             )}
           </div>
@@ -474,16 +559,105 @@ function RouteOptionCard({
       {/* Expandable detail */}
       {isActive && (
         <div className="border-t border-gray-100 p-3 space-y-3 bg-gray-50">
-          {/* Journey Timeline */}
+          {/* Journey Timeline (includes fare per segment) */}
           <JourneyTimeline
             steps={routeResult.steps}
             segments={routeResult.segments}
             totalTime={routeResult.total_time_min}
+            fareResult={fareResult}
           />
-          {/* Fare Breakdown */}
-          <FareBreakdown fareResult={fareResult} lines={lines} />
         </div>
       )}
+    </div>
+  );
+}
+
+interface RouteComparisonBarProps {
+  routeOptions: RouteOption[];
+  activeIndex: number;
+  onSelectRoute: (i: number) => void;
+  lines: Line[];
+  cheapestFare: number;
+  mostExpensiveFare: number;
+  fastestTime: number;
+  slowestTime: number;
+}
+
+function RouteComparisonBar({
+  routeOptions,
+  activeIndex,
+  onSelectRoute,
+  lines,
+  cheapestFare,
+  mostExpensiveFare,
+  fastestTime,
+  slowestTime,
+}: RouteComparisonBarProps) {
+  const lineMap = new Map(lines.map((l) => [l.id, l]));
+  const fareSaving = mostExpensiveFare - cheapestFare;
+  const timeSaving = slowestTime - fastestTime;
+
+  return (
+    <div className="flex overflow-x-auto gap-2 pb-2">
+      {routeOptions.map((option, i) => {
+        const { routeResult, fareResult } = option;
+        const isActive = i === activeIndex;
+        const isCheapest = fareResult.totalFare === cheapestFare;
+        const isFastest = routeResult.total_time_min === fastestTime;
+
+        const usedLineIds = [
+          ...new Set(
+            routeResult.steps
+              .filter((s) => s.line && !s.is_transfer)
+              .map((s) => s.line!.id),
+          ),
+        ];
+
+        return (
+          <button
+            key={i}
+            onClick={() => onSelectRoute(i)}
+            className={`min-w-[140px] border rounded-lg p-2 text-left transition-colors flex-shrink-0 ${
+              isActive
+                ? "border-blue-400 bg-blue-50"
+                : "border-gray-200 bg-white hover:bg-gray-50"
+            }`}
+          >
+            <div className="flex items-center gap-1 mb-1">
+              <span className="text-xs font-bold text-gray-500">#{i + 1}</span>
+              <div className="flex gap-0.5">
+                {usedLineIds.map((lid) => {
+                  const line = lineMap.get(lid);
+                  return line ? (
+                    <LineColorDot key={lid} color={line.color} />
+                  ) : null;
+                })}
+              </div>
+            </div>
+            <div className="text-sm font-bold text-gray-900">
+              {fareResult.segments.some((s) => s.isEstimated) ? "~" : ""}฿{fareResult.totalFare}
+            </div>
+            <div className="text-xs text-gray-500">{routeResult.total_time_min} นาที</div>
+            <div className="mt-1">
+              {isCheapest && isFastest && (
+                <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium">
+                  🏷️ ถูก+เร็วสุด
+                </span>
+              )}
+              {isCheapest && !isFastest && (
+                <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium">
+                  🏷️ ถูกกว่า ฿{fareSaving}
+                </span>
+              )}
+              {isFastest && !isCheapest && (
+                <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-medium">
+                  ⚡ เร็วกว่า {timeSaving} นาที
+                </span>
+              )}
+            </div>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -525,9 +699,13 @@ export function RouteResultDisplay({
 
   // Cheapest = first (sorted by fare), fastest = lowest time
   const cheapestFare = routeOptions[0].fareResult.totalFare;
+  const mostExpensiveFare = Math.max(...routeOptions.map((o) => o.fareResult.totalFare));
   const fastestTime = Math.min(
     ...routeOptions.map((o) => o.routeResult.total_time_min),
   );
+  const slowestTime = Math.max(...routeOptions.map((o) => o.routeResult.total_time_min));
+  const fareSaving = mostExpensiveFare - cheapestFare;
+  const timeSaving = slowestTime - fastestTime;
 
   return (
     <div className="space-y-2">
@@ -535,6 +713,18 @@ export function RouteResultDisplay({
         🚇 เส้นทาง{" "}
         {routeOptions.length > 1 ? `(${routeOptions.length} ตัวเลือก)` : ""}
       </h3>
+      {routeOptions.length > 1 && (
+        <RouteComparisonBar
+          routeOptions={routeOptions}
+          activeIndex={activeIndex}
+          onSelectRoute={onSelectRoute}
+          lines={lines}
+          cheapestFare={cheapestFare}
+          mostExpensiveFare={mostExpensiveFare}
+          fastestTime={fastestTime}
+          slowestTime={slowestTime}
+        />
+      )}
       {routeOptions.map((option, i) => (
         <RouteOptionCard
           key={i}
@@ -545,6 +735,9 @@ export function RouteResultDisplay({
           isFastest={option.routeResult.total_time_min === fastestTime}
           lines={lines}
           onSelect={() => onSelectRoute(i)}
+          fareSaving={fareSaving}
+          timeSaving={timeSaving}
+          routeCount={routeOptions.length}
         />
       ))}
     </div>

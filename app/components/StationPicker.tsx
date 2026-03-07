@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import type { Station, Line, StationLine, Operator } from "~/lib/types";
+import { getAliases } from "~/lib/station-aliases";
 
 interface StationPickerProps {
   stations: Station[];
@@ -96,12 +97,20 @@ export function StationPicker({
           });
         })
       : stations;
-    return candidates.filter(
-      (s) =>
-        s.name_th.toLowerCase().includes(q) ||
-        s.name_en.toLowerCase().includes(q) ||
-        (s.code && s.code.toLowerCase().includes(q)),
-    );
+    return candidates.filter((s) => {
+      const nameTh = s.name_th.toLowerCase();
+      const nameEn = s.name_en.toLowerCase();
+      const code = s.code?.toLowerCase() ?? "";
+      const aliases = getAliases(s.name_th).map((a) => a.toLowerCase());
+
+      return (
+        nameTh.includes(q) ||
+        nameEn.includes(q) ||
+        code.includes(q) ||
+        q.includes(nameTh) ||
+        aliases.some((alias) => alias.includes(q) || q.includes(alias))
+      );
+    });
   }, [query, stations, selectedOperatorCode, stationLineMap, operators]);
 
   const stationLines_ = (station: Station) =>

@@ -16,6 +16,12 @@ type LatLngTuple = [number, number];
 interface LeafletLayer {
   addTo(map: LeafletMapLike): LeafletLayer;
   bindTooltip(content: string, options: object): LeafletLayer;
+  setStyle(style: { opacity?: number; weight?: number }): void;
+}
+
+interface BasePolylineEntry {
+  polyline: LeafletLayer;
+  lineId: string;
 }
 
 interface LeafletMapLike {
@@ -53,6 +59,7 @@ export function TransitMap({
   const mapInstanceRef = useRef<unknown>(null);
   const markersRef = useRef<unknown[]>([]);
   const polylineRef = useRef<unknown[]>([]);
+  const basePolylinesRef = useRef<BasePolylineEntry[]>([]);
 
   // Build station -> lines lookup
   const stationLineMap = new Map<string, Line[]>();
@@ -100,6 +107,24 @@ export function TransitMap({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       }).addTo(map as any);
 
+      // Build line -> ordered lat/lng coordinates and draw base polylines
+      const stationMap = new Map(stations.map((s) => [s.id, s]));
+      basePolylinesRef.current = [];
+      for (const line of lines) {
+        const orderedStationLines = stationLines
+          .filter((sl) => sl.line_id === line.id)
+          .sort((a, b) => a.sequence_order - b.sequence_order);
+        const coords: LatLngTuple[] = orderedStationLines
+          .map((sl) => stationMap.get(sl.station_id))
+          .filter(Boolean)
+          .map((s) => [s!.lat, s!.lng]);
+        if (coords.length > 1) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const pl = L.polyline(coords, { color: line.color, weight: 4, opacity: 0.5 }).addTo(map as any);
+          basePolylinesRef.current.push({ polyline: pl, lineId: line.id });
+        }
+      }
+
       // Add station markers
       for (const station of stations) {
         const stLines = stationLineMap.get(station.id) || [];
@@ -133,6 +158,9 @@ export function TransitMap({
     const drawRoute = (L: LeafletFactoryLike, mapInstance: LeafletMapLike) => {
       if (!routeSteps) return;
 
+      // Dim background lines when route is shown
+      basePolylinesRef.current.forEach(({ polyline }) => polyline.setStyle({ opacity: 0.15 }));
+
       // Clear existing polylines
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       polylineRef.current.forEach((p) => (mapInstance as any).removeLayer(p));
@@ -150,8 +178,8 @@ export function TransitMap({
           const color = line?.color || "#6B7280";
           const polyline = L.polyline(currentPoints, {
             color,
-            weight: 5,
-            opacity: 0.8,
+            weight: 6,
+            opacity: 1.0,
           }).addTo(mapInstance);
           polylineRef.current.push(polyline);
         }
