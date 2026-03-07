@@ -388,6 +388,9 @@ interface RouteOptionCardProps {
   isFastest: boolean;
   lines: Line[];
   onSelect: () => void;
+  fareSaving?: number;
+  timeSaving?: number;
+  routeCount: number;
 }
 
 function RouteOptionCard({
@@ -398,6 +401,9 @@ function RouteOptionCard({
   isFastest,
   lines,
   onSelect,
+  fareSaving,
+  timeSaving,
+  routeCount,
 }: RouteOptionCardProps) {
   const { routeResult, fareResult } = option;
   const lineMap = new Map(lines.map((l) => [l.id, l]));
@@ -454,14 +460,19 @@ function RouteOptionCard({
           </div>
           {/* Badges */}
           <div className="flex gap-1">
-            {isCheapest && (
+            {routeCount > 1 && isCheapest && isFastest && (
               <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium">
-                🏷️ ถูกสุด
+                🏷️ ถูก+เร็วสุด
               </span>
             )}
-            {isFastest && !isCheapest && (
+            {routeCount > 1 && isCheapest && !isFastest && (
+              <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium">
+                🏷️ ถูกกว่า ฿{fareSaving}
+              </span>
+            )}
+            {routeCount > 1 && isFastest && !isCheapest && (
               <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-medium">
-                ⚡ เร็วสุด
+                ⚡ เร็วกว่า {timeSaving} นาที
               </span>
             )}
           </div>
@@ -484,6 +495,96 @@ function RouteOptionCard({
           <FareBreakdown fareResult={fareResult} lines={lines} />
         </div>
       )}
+    </div>
+  );
+}
+
+interface RouteComparisonBarProps {
+  routeOptions: RouteOption[];
+  activeIndex: number;
+  onSelectRoute: (i: number) => void;
+  lines: Line[];
+  cheapestFare: number;
+  mostExpensiveFare: number;
+  fastestTime: number;
+  slowestTime: number;
+}
+
+function RouteComparisonBar({
+  routeOptions,
+  activeIndex,
+  onSelectRoute,
+  lines,
+  cheapestFare,
+  mostExpensiveFare,
+  fastestTime,
+  slowestTime,
+}: RouteComparisonBarProps) {
+  const lineMap = new Map(lines.map((l) => [l.id, l]));
+  const fareSaving = mostExpensiveFare - cheapestFare;
+  const timeSaving = slowestTime - fastestTime;
+
+  return (
+    <div className="flex overflow-x-auto gap-2 pb-2">
+      {routeOptions.map((option, i) => {
+        const { routeResult, fareResult } = option;
+        const isActive = i === activeIndex;
+        const isCheapest = fareResult.totalFare === cheapestFare;
+        const isFastest = routeResult.total_time_min === fastestTime;
+
+        const usedLineIds = [
+          ...new Set(
+            routeResult.steps
+              .filter((s) => s.line && !s.is_transfer)
+              .map((s) => s.line!.id),
+          ),
+        ];
+
+        return (
+          <button
+            key={i}
+            onClick={() => onSelectRoute(i)}
+            className={`min-w-[140px] border rounded-lg p-2 text-left transition-colors flex-shrink-0 ${
+              isActive
+                ? "border-blue-400 bg-blue-50"
+                : "border-gray-200 bg-white hover:bg-gray-50"
+            }`}
+          >
+            <div className="flex items-center gap-1 mb-1">
+              <span className="text-xs font-bold text-gray-500">#{i + 1}</span>
+              <div className="flex gap-0.5">
+                {usedLineIds.map((lid) => {
+                  const line = lineMap.get(lid);
+                  return line ? (
+                    <LineColorDot key={lid} color={line.color} />
+                  ) : null;
+                })}
+              </div>
+            </div>
+            <div className="text-sm font-bold text-gray-900">
+              {fareResult.segments.some((s) => s.isEstimated) ? "~" : ""}฿{fareResult.totalFare}
+            </div>
+            <div className="text-xs text-gray-500">{routeResult.total_time_min} นาที</div>
+            <div className="mt-1">
+              {isCheapest && isFastest && (
+                <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium">
+                  🏷️ ถูก+เร็วสุด
+                </span>
+              )}
+              {isCheapest && !isFastest && (
+                <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium">
+                  🏷️ ถูกกว่า ฿{fareSaving}
+                </span>
+              )}
+              {isFastest && !isCheapest && (
+                <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-medium">
+                  ⚡ เร็วกว่า {timeSaving} นาที
+                </span>
+              )}
+            </div>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -525,9 +626,13 @@ export function RouteResultDisplay({
 
   // Cheapest = first (sorted by fare), fastest = lowest time
   const cheapestFare = routeOptions[0].fareResult.totalFare;
+  const mostExpensiveFare = Math.max(...routeOptions.map((o) => o.fareResult.totalFare));
   const fastestTime = Math.min(
     ...routeOptions.map((o) => o.routeResult.total_time_min),
   );
+  const slowestTime = Math.max(...routeOptions.map((o) => o.routeResult.total_time_min));
+  const fareSaving = mostExpensiveFare - cheapestFare;
+  const timeSaving = slowestTime - fastestTime;
 
   return (
     <div className="space-y-2">
@@ -535,6 +640,18 @@ export function RouteResultDisplay({
         🚇 เส้นทาง{" "}
         {routeOptions.length > 1 ? `(${routeOptions.length} ตัวเลือก)` : ""}
       </h3>
+      {routeOptions.length > 1 && (
+        <RouteComparisonBar
+          routeOptions={routeOptions}
+          activeIndex={activeIndex}
+          onSelectRoute={onSelectRoute}
+          lines={lines}
+          cheapestFare={cheapestFare}
+          mostExpensiveFare={mostExpensiveFare}
+          fastestTime={fastestTime}
+          slowestTime={slowestTime}
+        />
+      )}
       {routeOptions.map((option, i) => (
         <RouteOptionCard
           key={i}
@@ -545,6 +662,9 @@ export function RouteResultDisplay({
           isFastest={option.routeResult.total_time_min === fastestTime}
           lines={lines}
           onSelect={() => onSelectRoute(i)}
+          fareSaving={fareSaving}
+          timeSaving={timeSaving}
+          routeCount={routeOptions.length}
         />
       ))}
     </div>
