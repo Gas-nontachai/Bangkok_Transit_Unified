@@ -28,6 +28,34 @@ export interface RouteOption {
   pathSteps: PathStep[];
 }
 
+const DEFAULT_ORIGIN_COLOR = "#22c55e";
+const DEFAULT_DESTINATION_COLOR = "#ef4444";
+
+function getFirstPathLineColor(pathSteps: PathStep[] | undefined, lines: Line[]): string {
+  if (!pathSteps) return DEFAULT_ORIGIN_COLOR;
+
+  for (const step of pathSteps) {
+    if (!step.isTransfer && step.lineId) {
+      return lines.find((line) => line.id === step.lineId)?.color || DEFAULT_ORIGIN_COLOR;
+    }
+  }
+
+  return DEFAULT_ORIGIN_COLOR;
+}
+
+function getLastPathLineColor(pathSteps: PathStep[] | undefined, lines: Line[]): string {
+  if (!pathSteps) return DEFAULT_DESTINATION_COLOR;
+
+  for (let i = pathSteps.length - 1; i >= 0; i--) {
+    const step = pathSteps[i];
+    if (!step.isTransfer && step.lineId) {
+      return lines.find((line) => line.id === step.lineId)?.color || DEFAULT_DESTINATION_COLOR;
+    }
+  }
+
+  return DEFAULT_DESTINATION_COLOR;
+}
+
 export function meta({}: Route.MetaArgs) {
   return [
     { title: "Bangkok Transit Unified" },
@@ -131,6 +159,9 @@ export default function Home({ loaderData }: Route.ComponentProps) {
     [stations],
   );
   const lineMap = useMemo(() => new Map(lines.map((l) => [l.id, l])), [lines]);
+  const activePathSteps = routeOptions[activeRouteIndex]?.pathSteps;
+  const originRouteColor = getFirstPathLineColor(activePathSteps, lines);
+  const destinationRouteColor = getLastPathLineColor(activePathSteps, lines);
 
   // Initialise origin/destination from URL params and auto-search once
   useEffect(() => {
@@ -281,12 +312,18 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         {!searchExpanded && routeOptions.length > 0 && (
           <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-100 bg-gray-50 flex-shrink-0">
             <div className="flex-1 flex items-center gap-1.5 text-sm min-w-0 overflow-hidden">
-              <span className="text-green-700 font-semibold truncate max-w-[40%]">
-                🟢 {origin?.name_th}
+              <span
+                className="font-semibold truncate max-w-[40%]"
+                style={{ color: originRouteColor }}
+              >
+                ⬤ {origin?.name_th}
               </span>
               <span className="text-gray-400 flex-shrink-0">→</span>
-              <span className="text-red-700 font-semibold truncate max-w-[40%]">
-                🔴 {destination?.name_th}
+              <span
+                className="font-semibold truncate max-w-[40%]"
+                style={{ color: destinationRouteColor }}
+              >
+                ⬤ {destination?.name_th}
               </span>
             </div>
             <button

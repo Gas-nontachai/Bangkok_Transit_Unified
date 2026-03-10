@@ -2,6 +2,7 @@ import { beforeEach, describe, it, expect, vi } from "vitest";
 import { render, waitFor } from "@testing-library/react";
 import { TransitMap } from "./TransitMap";
 import type { Station, Line, StationLine } from "~/lib/types";
+import type { PathStep } from "~/lib/dijkstra";
 
 const createdMarkers: ReturnType<typeof createMockMarker>[] = [];
 
@@ -199,5 +200,101 @@ describe("TransitMap", () => {
     expect(marker.bindPopup).toHaveBeenCalled();
     expect(marker.off).not.toHaveBeenCalled();
     expect(marker.on).not.toHaveBeenCalled();
+  });
+
+  it("uses destination line color for the destination marker", async () => {
+    const L = (await import("leaflet")).default;
+    const routeSteps: PathStep[] = [
+      { stationId: "s1", lineId: "L1", travelTimeMin: 0, isTransfer: false },
+      { stationId: "s2", lineId: "L1", travelTimeMin: 5, isTransfer: false },
+    ];
+
+    render(
+      <TransitMap
+        stations={mockStations2}
+        lines={mockLines}
+        stationLines={mockStationLines2}
+        routeSteps={routeSteps}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(L.circleMarker).toHaveBeenCalledWith(
+        [13.7362, 100.5604],
+        expect.objectContaining({ fillColor: "#00843D" }),
+      );
+    });
+  });
+
+  it("uses origin line color for the origin marker", async () => {
+    const L = (await import("leaflet")).default;
+    const routeSteps: PathStep[] = [
+      { stationId: "s1", lineId: "L1", travelTimeMin: 0, isTransfer: false },
+      { stationId: "s2", lineId: "L1", travelTimeMin: 5, isTransfer: false },
+    ];
+
+    render(
+      <TransitMap
+        stations={mockStations2}
+        lines={mockLines}
+        stationLines={mockStationLines2}
+        routeSteps={routeSteps}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(L.circleMarker).toHaveBeenCalledWith(
+        [13.7453, 100.5342],
+        expect.objectContaining({ fillColor: "#00843D" }),
+      );
+    });
+  });
+
+  it("falls back to red destination marker when route has no destination line", async () => {
+    const L = (await import("leaflet")).default;
+    const routeSteps: PathStep[] = [
+      { stationId: "s1", lineId: null, travelTimeMin: 0, isTransfer: false },
+      { stationId: "s2", lineId: null, travelTimeMin: 5, isTransfer: false },
+    ];
+
+    render(
+      <TransitMap
+        stations={mockStations2}
+        lines={mockLines}
+        stationLines={mockStationLines2}
+        routeSteps={routeSteps}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(L.circleMarker).toHaveBeenCalledWith(
+        [13.7362, 100.5604],
+        expect.objectContaining({ fillColor: "#ef4444" }),
+      );
+    });
+  });
+
+  it("falls back to green origin marker when route has no origin line", async () => {
+    const L = (await import("leaflet")).default;
+    const routeSteps: PathStep[] = [
+      { stationId: "s1", lineId: null, travelTimeMin: 0, isTransfer: false },
+      { stationId: "s2", lineId: null, travelTimeMin: 5, isTransfer: false },
+    ];
+
+    render(
+      <TransitMap
+        stations={mockStations2}
+        lines={mockLines}
+        stationLines={mockStationLines2}
+        routeSteps={routeSteps}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(L.circleMarker).toHaveBeenCalledWith(
+        [13.7453, 100.5342],
+        expect.objectContaining({ fillColor: "#22c55e" }),
+      );
+    });
   });
 });

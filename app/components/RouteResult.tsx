@@ -13,6 +13,30 @@ interface RouteResultProps {
   error?: string | null;
 }
 
+const DEFAULT_DESTINATION_COLOR = "#ef4444";
+const DEFAULT_ORIGIN_COLOR = "#22c55e";
+
+function getFirstTransitLineColor(steps: RouteStep[]): string {
+  for (const step of steps) {
+    if (!step.is_transfer && step.line?.color) {
+      return step.line.color;
+    }
+  }
+
+  return DEFAULT_ORIGIN_COLOR;
+}
+
+function getLastTransitLineColor(steps: RouteStep[]): string {
+  for (let i = steps.length - 1; i >= 0; i--) {
+    const step = steps[i];
+    if (!step.is_transfer && step.line?.color) {
+      return step.line.color;
+    }
+  }
+
+  return DEFAULT_DESTINATION_COLOR;
+}
+
 function LineColorDot({ color }: { color: string }) {
   return (
     <span
@@ -369,20 +393,36 @@ function JourneyTimeline({
   }
   const origin = steps[0]?.station;
   const destination = steps[steps.length - 1]?.station;
+  const originLineColor = getFirstTransitLineColor(steps);
+  const destinationLineColor = getLastTransitLineColor(steps);
 
   return (
     <div className="space-y-1">
       {/* Origin */}
       {origin && (
         <div className="flex items-center gap-2 pb-2">
-          <span className="w-4 h-4 rounded-full bg-green-500 flex-shrink-0 ring-2 ring-green-200" />
+          <span
+            data-testid="origin-dot"
+            className="w-4 h-4 rounded-full flex-shrink-0 ring-2"
+            style={{
+              backgroundColor: originLineColor,
+              boxShadow: `0 0 0 4px ${originLineColor}44`,
+            }}
+          />
           <div className="flex-1 min-w-0">
             <span className="text-sm font-bold text-gray-900">
               {origin.name_th}
             </span>
             <span className="text-xs text-gray-400 ml-1">{origin.name_en}</span>
           </div>
-          <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium flex-shrink-0">
+          <span
+            data-testid="origin-badge"
+            className="text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0"
+            style={{
+              backgroundColor: `${originLineColor}22`,
+              color: originLineColor,
+            }}
+          >
             ต้นทาง
           </span>
         </div>
@@ -408,7 +448,14 @@ function JourneyTimeline({
       {/* Destination */}
       {destination && (
         <div className="flex items-center gap-2 pt-2">
-          <span className="w-4 h-4 rounded-full bg-red-500 flex-shrink-0 ring-2 ring-red-200" />
+          <span
+            data-testid="destination-dot"
+            className="w-4 h-4 rounded-full flex-shrink-0 ring-2"
+            style={{
+              backgroundColor: destinationLineColor,
+              boxShadow: `0 0 0 4px ${destinationLineColor}44`,
+            }}
+          />
           <div className="flex-1 min-w-0">
             <span className="text-sm font-bold text-gray-900">
               {destination.name_th}
@@ -417,7 +464,14 @@ function JourneyTimeline({
               {destination.name_en}
             </span>
           </div>
-          <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium flex-shrink-0">
+          <span
+            data-testid="destination-badge"
+            className="text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0"
+            style={{
+              backgroundColor: `${destinationLineColor}22`,
+              color: destinationLineColor,
+            }}
+          >
             ปลายทาง
           </span>
         </div>

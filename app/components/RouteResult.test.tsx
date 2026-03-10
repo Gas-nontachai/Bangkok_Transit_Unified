@@ -191,4 +191,134 @@ describe("RouteResultDisplay", () => {
     );
     expect(screen.getAllByText(/ถูก\+เร็วสุด/).length).toBeGreaterThanOrEqual(1);
   });
+
+  it("uses destination line color for destination dot and badge", () => {
+    render(
+      <RouteResultDisplay
+        routeOptions={[makeOption(17, 5)]}
+        activeIndex={0}
+        onSelectRoute={() => {}}
+        stations={mockStations}
+        lines={mockLines}
+      />,
+    );
+
+    expect(screen.getByTestId("destination-dot")).toHaveStyle({
+      backgroundColor: "rgb(0, 132, 61)",
+    });
+    expect(screen.getByTestId("destination-badge")).toHaveStyle({
+      color: "rgb(0, 132, 61)",
+    });
+  });
+
+  it("uses origin line color for origin dot and badge", () => {
+    render(
+      <RouteResultDisplay
+        routeOptions={[makeOption(17, 5)]}
+        activeIndex={0}
+        onSelectRoute={() => {}}
+        stations={mockStations}
+        lines={mockLines}
+      />,
+    );
+
+    expect(screen.getByTestId("origin-dot")).toHaveStyle({
+      backgroundColor: "rgb(0, 132, 61)",
+    });
+    expect(screen.getByTestId("origin-badge")).toHaveStyle({
+      color: "rgb(0, 132, 61)",
+    });
+  });
+
+  it("falls back to red destination color when destination line is missing", () => {
+    const optionWithoutDestinationLine: RouteOption = {
+      routeResult: {
+        steps: [
+          {
+            station: mockStations[0],
+            line: null,
+            is_transfer: false,
+            travel_time_min: 0,
+          },
+          {
+            station: mockStations[1],
+            line: null,
+            is_transfer: false,
+            travel_time_min: 5,
+          },
+        ],
+        segments: [],
+        total_time_min: 5,
+        total_fare: 17,
+      },
+      fareResult: {
+        segments: [],
+        totalFare: 17,
+      },
+      pathSteps: [],
+    };
+
+    render(
+      <RouteResultDisplay
+        routeOptions={[optionWithoutDestinationLine]}
+        activeIndex={0}
+        onSelectRoute={() => {}}
+        stations={mockStations}
+        lines={mockLines}
+      />,
+    );
+
+    expect(screen.getByTestId("destination-dot")).toHaveStyle({
+      backgroundColor: "rgb(239, 68, 68)",
+    });
+    expect(screen.getByTestId("destination-badge")).toHaveStyle({
+      color: "rgb(239, 68, 68)",
+    });
+  });
+
+  it("falls back to green origin color when origin line is missing", () => {
+    const optionWithoutOriginLine: RouteOption = {
+      routeResult: {
+        steps: [
+          {
+            station: mockStations[0],
+            line: null,
+            is_transfer: false,
+            travel_time_min: 0,
+          },
+          {
+            station: mockStations[1],
+            line: null,
+            is_transfer: false,
+            travel_time_min: 5,
+          },
+        ],
+        segments: [],
+        total_time_min: 5,
+        total_fare: 17,
+      },
+      fareResult: {
+        segments: [],
+        totalFare: 17,
+      },
+      pathSteps: [],
+    };
+
+    render(
+      <RouteResultDisplay
+        routeOptions={[optionWithoutOriginLine]}
+        activeIndex={0}
+        onSelectRoute={() => {}}
+        stations={mockStations}
+        lines={mockLines}
+      />,
+    );
+
+    expect(screen.getByTestId("origin-dot")).toHaveStyle({
+      backgroundColor: "rgb(34, 197, 94)",
+    });
+    expect(screen.getByTestId("origin-badge")).toHaveStyle({
+      color: "rgb(34, 197, 94)",
+    });
+  });
 });

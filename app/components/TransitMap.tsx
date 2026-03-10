@@ -13,45 +13,46 @@ interface TransitMapProps {
 
 type LatLngTuple = [number, number];
 
-interface LeafletLayer {
-  addTo(map: LeafletMapLike): LeafletLayer;
-  bindPopup(content: string): LeafletLayer;
-  bindTooltip(content: string, options: object): LeafletLayer;
-  closePopup(): LeafletLayer;
-  off(event: string): LeafletLayer;
-  on(event: string, handler: () => void): LeafletLayer;
-  openPopup(): LeafletLayer;
+interface LeafletLayerLike {
+  addTo(map: any): LeafletLayerLike;
+  bindPopup(content: string): LeafletLayerLike;
+  bindTooltip(content: string, options: object): LeafletLayerLike;
+  closePopup(): LeafletLayerLike;
+  off(event: string): LeafletLayerLike;
+  on(event: string, handler: () => void): LeafletLayerLike;
+  openPopup(): LeafletLayerLike;
   setStyle(style: { opacity?: number; weight?: number }): void;
 }
 
 interface BasePolylineEntry {
-  polyline: LeafletLayer;
+  polyline: LeafletLayerLike;
   lineId: string;
 }
 
-interface LeafletMapLike {
-  removeLayer(layer: unknown): void;
-  fitBounds(
-    bounds: LatLngTuple[],
-    options: { padding: [number, number] },
-  ): void;
+const DEFAULT_DESTINATION_COLOR = "#ef4444";
+const DEFAULT_ORIGIN_COLOR = "#22c55e";
+
+function getFirstRouteLineColor(routeSteps: PathStep[] | undefined, lines: Line[]): string {
+  if (!routeSteps) return DEFAULT_ORIGIN_COLOR;
+
+  for (const step of routeSteps) {
+    if (step.isTransfer || !step.lineId) continue;
+    return lines.find((line) => line.id === step.lineId)?.color || DEFAULT_ORIGIN_COLOR;
+  }
+
+  return DEFAULT_ORIGIN_COLOR;
 }
 
-interface LeafletFactoryLike {
-  polyline(
-    points: LatLngTuple[],
-    options: { color: string; weight: number; opacity: number },
-  ): LeafletLayer;
-  circleMarker(
-    point: LatLngTuple,
-    options: {
-      radius: number;
-      fillColor: string;
-      color: string;
-      weight: number;
-      fillOpacity: number;
-    },
-  ): LeafletLayer;
+function getLastRouteLineColor(routeSteps: PathStep[] | undefined, lines: Line[]): string {
+  if (!routeSteps) return DEFAULT_DESTINATION_COLOR;
+
+  for (let i = routeSteps.length - 1; i >= 0; i--) {
+    const step = routeSteps[i];
+    if (step.isTransfer || !step.lineId) continue;
+    return lines.find((line) => line.id === step.lineId)?.color || DEFAULT_DESTINATION_COLOR;
+  }
+
+  return DEFAULT_DESTINATION_COLOR;
 }
 
 export function TransitMap({
@@ -175,7 +176,7 @@ export function TransitMap({
       }
     };
 
-    const drawRoute = (L: LeafletFactoryLike, mapInstance: LeafletMapLike) => {
+    const drawRoute = (L: any, mapInstance: any) => {
       if (!routeSteps) return;
 
       // Dim background lines when route is shown
@@ -231,38 +232,48 @@ export function TransitMap({
       const destStation = stations.find(
         (s) => s.id === routeSteps[routeSteps.length - 1].stationId,
       );
+      const originLineColor = getFirstRouteLineColor(routeSteps, lines);
+      const destinationLineColor = getLastRouteLineColor(routeSteps, lines);
 
       if (originStation) {
         const m = L.circleMarker([originStation.lat, originStation.lng], {
           radius: 10,
-          fillColor: "#22c55e",
+          fillColor: originLineColor,
           color: "#ffffff",
           weight: 2,
           fillOpacity: 1,
         })
           .addTo(mapInstance)
-          .bindTooltip(`🟢 ${originStation.name_th}`, {
-            permanent: true,
-            direction: "top",
-            offset: [0, -8],
-          });
+          .bindTooltip(
+            `<span style="color: ${originLineColor}; font-weight: 600;">⬤ ${originStation.name_th}</span>`,
+            {
+              permanent: true,
+              direction: "top",
+              offset: [0, -8],
+              className: "origin-tooltip",
+            },
+          );
         polylineRef.current.push(m);
       }
 
       if (destStation) {
         const m = L.circleMarker([destStation.lat, destStation.lng], {
           radius: 10,
-          fillColor: "#ef4444",
+          fillColor: destinationLineColor,
           color: "#ffffff",
           weight: 2,
           fillOpacity: 1,
         })
           .addTo(mapInstance)
-          .bindTooltip(`🔴 ${destStation.name_th}`, {
+          .bindTooltip(
+            `<span style="color: ${destinationLineColor}; font-weight: 600;">⬤ ${destStation.name_th}</span>`,
+            {
             permanent: true,
             direction: "top",
             offset: [0, -8],
-          });
+            className: "destination-tooltip",
+            },
+          );
         polylineRef.current.push(m);
       }
 
