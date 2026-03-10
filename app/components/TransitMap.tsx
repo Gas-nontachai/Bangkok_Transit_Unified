@@ -15,7 +15,12 @@ type LatLngTuple = [number, number];
 
 interface LeafletLayer {
   addTo(map: LeafletMapLike): LeafletLayer;
+  bindPopup(content: string): LeafletLayer;
   bindTooltip(content: string, options: object): LeafletLayer;
+  closePopup(): LeafletLayer;
+  off(event: string): LeafletLayer;
+  on(event: string, handler: () => void): LeafletLayer;
+  openPopup(): LeafletLayer;
   setStyle(style: { opacity?: number; weight?: number }): void;
 }
 
@@ -60,6 +65,10 @@ export function TransitMap({
   const markersRef = useRef<unknown[]>([]);
   const polylineRef = useRef<unknown[]>([]);
   const basePolylinesRef = useRef<BasePolylineEntry[]>([]);
+  const supportsHover =
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(hover: hover) and (pointer: fine)").matches;
 
   // Build station -> lines lookup
   const stationLineMap = new Map<string, Line[]>();
@@ -140,9 +149,20 @@ export function TransitMap({
         });
 
         const lineNames = stLines.map((l) => l.name_th).join(", ");
-        circleMarker.bindPopup(
-          `<b>${station.name_th}</b><br>${station.name_en}<br><small>${lineNames}</small>`,
-        );
+        const popupContent = `<b>${station.name_th}</b><br>${station.name_en}<br><small>${lineNames}</small>`;
+        circleMarker.bindPopup(popupContent);
+
+        if (supportsHover) {
+          circleMarker
+            .off("click")
+            .off("keypress")
+            .on("mouseover", () => {
+              circleMarker.openPopup();
+            })
+            .on("mouseout", () => {
+              circleMarker.closePopup();
+            });
+        }
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         circleMarker.addTo(map as any);

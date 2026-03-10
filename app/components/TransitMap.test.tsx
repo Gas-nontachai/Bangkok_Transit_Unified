@@ -1,7 +1,21 @@
-import { describe, it, expect, vi } from "vitest";
+import { beforeEach, describe, it, expect, vi } from "vitest";
 import { render, waitFor } from "@testing-library/react";
 import { TransitMap } from "./TransitMap";
 import type { Station, Line, StationLine } from "~/lib/types";
+
+const createdMarkers: ReturnType<typeof createMockMarker>[] = [];
+
+function createMockMarker() {
+  return {
+    addTo: vi.fn().mockReturnThis(),
+    bindPopup: vi.fn().mockReturnThis(),
+    bindTooltip: vi.fn().mockReturnThis(),
+    closePopup: vi.fn().mockReturnThis(),
+    off: vi.fn().mockReturnThis(),
+    on: vi.fn().mockReturnThis(),
+    openPopup: vi.fn().mockReturnThis(),
+  };
+}
 
 // Mock Leaflet since it requires DOM APIs not available in test env
 vi.mock("leaflet", () => ({
@@ -13,10 +27,11 @@ vi.mock("leaflet", () => ({
       removeLayer: vi.fn(),
     })),
     tileLayer: vi.fn(() => ({ addTo: vi.fn() })),
-    circleMarker: vi.fn(() => ({
-      bindPopup: vi.fn().mockReturnThis(),
-      addTo: vi.fn().mockReturnThis(),
-    })),
+    circleMarker: vi.fn(() => {
+      const marker = createMockMarker();
+      createdMarkers.push(marker);
+      return marker;
+    }),
     polyline: vi.fn(() => ({
       addTo: vi.fn().mockReturnThis(),
       setStyle: vi.fn(),
@@ -83,6 +98,25 @@ const mockStationLines2: StationLine[] = [
   { station_id: "s2", line_id: "L1", sequence_order: 2 },
 ];
 
+beforeEach(() => {
+  createdMarkers.length = 0;
+  vi.clearAllMocks();
+  Object.defineProperty(window, "matchMedia", {
+    configurable: true,
+    writable: true,
+    value: vi.fn().mockImplementation(() => ({
+      matches: true,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+      media: "(hover: hover) and (pointer: fine)",
+      onchange: null,
+    })),
+  });
+});
+
 describe("TransitMap", () => {
   it("renders map container", () => {
     const { container } = render(
@@ -108,5 +142,62 @@ describe("TransitMap", () => {
     await waitFor(() => {
       expect(L.polyline).toHaveBeenCalled();
     });
+  });
+
+  it("binds station popups to hover events on hover-capable devices", async () => {
+    render(
+      <TransitMap
+        stations={mockStations}
+        lines={mockLines}
+        stationLines={mockStationLines}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(createdMarkers).toHaveLength(1);
+    });
+
+    const marker = createdMarkers[0];
+    expect(marker.bindPopup).toHaveBeenCalledWith(
+      "<b>สยาม</b><br>Siam<br><small>สุขุมวิท</small>",
+    );
+    expect(marker.off).toHaveBeenCalledWith("click");
+    expect(marker.off).toHaveBeenCalledWith("keypress");
+    expect(marker.on).toHaveBeenCalledWith("mouseover", expect.any(Function));
+    expect(marker.on).toHaveBeenCalledWith("mouseout", expect.any(Function));
+  });
+
+  it("keeps tap popup behavior on touch devices", async () => {
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      writable: true,
+      value: vi.fn().mockImplementation(() => ({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+        media: "(hover: hover) and (pointer: fine)",
+        onchange: null,
+      })),
+    });
+
+    render(
+      <TransitMap
+        stations={mockStations}
+        lines={mockLines}
+        stationLines={mockStationLines}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(createdMarkers).toHaveLength(1);
+    });
+
+    const marker = createdMarkers[0];
+    expect(marker.bindPopup).toHaveBeenCalled();
+    expect(marker.off).not.toHaveBeenCalled();
+    expect(marker.on).not.toHaveBeenCalled();
   });
 });
