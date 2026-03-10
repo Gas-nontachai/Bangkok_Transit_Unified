@@ -212,6 +212,19 @@ export default function Home({ loaderData }: Route.ComponentProps) {
     updateUrl(newOrigin, newDest);
   };
 
+  const handleReset = () => {
+    setOrigin(null);
+    setDestination(null);
+    setRouteOptions([]);
+    setActiveRouteIndex(0);
+    setPathSteps([]);
+    setSearchError(null);
+    setSearchExpanded(true);
+    setShowSharePanel(false);
+    setCopySuccess(false);
+    updateUrl(null, null);
+  };
+
   const handleSearch = () => {
     if (!origin || !destination) return;
     setIsSearching(true);
@@ -333,6 +346,13 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             >
               ✏️ เปลี่ยน
             </button>
+            <button
+              onClick={handleReset}
+              className="flex-shrink-0 px-3 py-1.5 text-xs text-gray-600 border border-gray-200 rounded-full hover:bg-gray-100 transition-colors"
+              aria-label="รีเซ็ตเส้นทาง"
+            >
+              ↺ รีเซ็ต
+            </button>
           </div>
         )}
 
@@ -385,6 +405,15 @@ export default function Home({ loaderData }: Route.ComponentProps) {
               {isSearching ? "กำลังค้นหา..." : "🔍 ค้นหาเส้นทาง"}
             </button>
           </div>
+          {(origin || destination || routeOptions.length > 0) && (
+            <button
+              onClick={handleReset}
+              className="w-full py-2.5 text-sm text-gray-600 border border-gray-200 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+              aria-label="รีเซ็ตเส้นทาง"
+            >
+              ↺ รีเซ็ตการเลือก
+            </button>
+          )}
         </div>
 
         {/* Route Result — scrollable on mobile */}
