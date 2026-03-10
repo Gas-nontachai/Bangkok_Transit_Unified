@@ -297,4 +297,88 @@ describe("TransitMap", () => {
       );
     });
   });
+
+  it("starts the next line polyline from the transfer arrival station", async () => {
+    const L = (await import("leaflet")).default;
+    const transferStations: Station[] = [
+      {
+        id: "s1",
+        name_th: "หมอชิต",
+        name_en: "Mo Chit",
+        code: "N8",
+        lat: 13.8,
+        lng: 100.55,
+        is_interchange: true,
+      },
+      {
+        id: "s2",
+        name_th: "อโศก",
+        name_en: "Asok",
+        code: "E4",
+        lat: 13.79,
+        lng: 100.551,
+        is_interchange: true,
+      },
+      {
+        id: "s3",
+        name_th: "จตุจักร",
+        name_en: "Chatuchak Park",
+        code: "BL13",
+        lat: 13.80232,
+        lng: 100.55308,
+        is_interchange: true,
+      },
+      {
+        id: "s4",
+        name_th: "กำแพงเพชร",
+        name_en: "Kamphaeng Phet",
+        code: "BL12",
+        lat: 13.79775,
+        lng: 100.54022,
+        is_interchange: false,
+      },
+    ];
+    const transferLines: Line[] = [
+      mockLines[0],
+      {
+        id: "L2",
+        operator_id: "op2",
+        name_th: "สีน้ำเงิน",
+        name_en: "Blue",
+        code: "BLU",
+        color: "#1e40af",
+      },
+    ];
+    const transferStationLines: StationLine[] = [
+      { station_id: "s1", line_id: "L1", sequence_order: 1 },
+      { station_id: "s2", line_id: "L1", sequence_order: 2 },
+      { station_id: "s3", line_id: "L2", sequence_order: 1 },
+      { station_id: "s4", line_id: "L2", sequence_order: 2 },
+    ];
+    const routeSteps: PathStep[] = [
+      { stationId: "s1", lineId: "L1", travelTimeMin: 0, isTransfer: false },
+      { stationId: "s2", lineId: "L1", travelTimeMin: 3, isTransfer: false },
+      { stationId: "s3", lineId: "L2", travelTimeMin: 5, isTransfer: true },
+      { stationId: "s4", lineId: "L2", travelTimeMin: 2, isTransfer: false },
+    ];
+
+    render(
+      <TransitMap
+        stations={transferStations}
+        lines={transferLines}
+        stationLines={transferStationLines}
+        routeSteps={routeSteps}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(L.polyline).toHaveBeenCalledWith(
+        [
+          [13.80232, 100.55308],
+          [13.79775, 100.54022],
+        ],
+        expect.objectContaining({ color: "#1e40af" }),
+      );
+    });
+  });
 });

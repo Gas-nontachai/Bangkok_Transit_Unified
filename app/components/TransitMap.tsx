@@ -192,6 +192,7 @@ export function TransitMap({
       // Group steps by line segment and draw colored polylines
       let currentLineId: string | null = null;
       let currentPoints: [number, number][] = [];
+      let pendingTransferPoint: [number, number] | null = null;
 
       const flushPolyline = () => {
         if (currentPoints.length > 1 && currentLineId) {
@@ -209,7 +210,11 @@ export function TransitMap({
       for (const step of routeSteps) {
         if (step.isTransfer) {
           flushPolyline();
-          currentPoints = [];
+          const transferStation = stationMap.get(step.stationId);
+          pendingTransferPoint = transferStation
+            ? [transferStation.lat, transferStation.lng]
+            : null;
+          currentPoints = pendingTransferPoint ? [pendingTransferPoint] : [];
           currentLineId = null;
           continue;
         }
@@ -218,11 +223,13 @@ export function TransitMap({
 
         if (step.lineId !== currentLineId) {
           flushPolyline();
-          const lastPoint = currentPoints[currentPoints.length - 1];
+          const lastPoint =
+            pendingTransferPoint ?? currentPoints[currentPoints.length - 1];
           currentPoints = lastPoint ? [lastPoint] : [];
           currentLineId = step.lineId;
         }
         currentPoints.push([station.lat, station.lng]);
+        pendingTransferPoint = null;
       }
       flushPolyline();
 

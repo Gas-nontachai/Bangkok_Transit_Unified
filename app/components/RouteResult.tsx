@@ -68,6 +68,7 @@ type JourneyItem =
   | {
       type: "transfer";
       fromStation: Station;
+      toStation: Station;
       toLine: Line;
       walkTime: number;
     };
@@ -100,17 +101,20 @@ function buildJourneyItems(
       }
       // Add transfer item — step.line is the line we're switching TO
       const fromStation = steps[i - 1]?.station;
-      if (fromStation && step.line) {
+      if (fromStation && step.station && step.line) {
         items.push({
           type: "transfer",
           fromStation,
+          toStation: step.station,
           toLine: step.line,
           walkTime: step.travel_time_min,
         });
       }
-      currentLine = null;
-      currentOperator = null;
-      currentStations = [];
+      currentLine = step.line ?? null;
+      currentOperator = step.line
+        ? operatorByLineId.get(step.line.id) ?? null
+        : null;
+      currentStations = step.station ? [step.station] : [];
       currentTime = 0;
     } else {
       // Detect line change at same station (e.g., Siam: Silom→Sukhumvit, Phaya Thai: Sukhumvit→ARL)
@@ -283,7 +287,9 @@ function FullJourneyStationList({ items }: { items: JourneyItem[] }) {
                         className={`rounded-full flex-shrink-0 ${isEndpoint ? "w-3.5 h-3.5 ring-2" : "w-2.5 h-2.5"}`}
                         style={{
                           backgroundColor: item.line.color,
-                          ...(isEndpoint ? { ringColor: item.line.color + "44" } : {}),
+                          ...(isEndpoint
+                            ? { boxShadow: `0 0 0 4px ${item.line.color}44` }
+                            : {}),
                         }}
                       />
                       {/* Bottom connector line */}
@@ -335,12 +341,20 @@ function TransferRow({
       <div className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
         {/* Line 1: station name */}
         <div className="flex items-center gap-1.5">
-          <span className="text-xs text-gray-500">📍 เปลี่ยนสายที่</span>
+          <span className="text-xs text-gray-500">📍 เดินจาก</span>
           <span className="text-xs font-bold text-gray-900">
             {item.fromStation.name_th}
           </span>
           <span className="text-xs text-gray-400">
             {item.fromStation.name_en}
+          </span>
+          <span className="text-xs text-gray-400">→</span>
+          <span className="text-xs text-gray-500">ไป</span>
+          <span className="text-xs font-bold text-gray-900">
+            {item.toStation.name_th}
+          </span>
+          <span className="text-xs text-gray-400">
+            {item.toStation.name_en}
           </span>
         </div>
         {/* Line 2: walk time + destination line */}
