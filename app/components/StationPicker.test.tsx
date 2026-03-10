@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { StationPicker } from "./StationPicker";
-import type { Station, Line, StationLine, Operator } from "~/lib/types";
+import type { Station, Line, StationLine } from "~/lib/types";
 
 const mockStations: Station[] = [
   {
@@ -49,6 +49,15 @@ const mockStations: Station[] = [
     lng: 100.5598,
     is_interchange: false,
   },
+  {
+    id: "s6",
+    name_th: "เจริญนคร",
+    name_en: "Charoen Nakhon",
+    code: "G2",
+    lat: 13.7272,
+    lng: 100.5095,
+    is_interchange: false,
+  },
 ];
 
 const mockLines: Line[] = [
@@ -60,14 +69,21 @@ const mockLines: Line[] = [
     code: "SUK",
     color: "#00843D",
   },
-];
-
-const mockOperators: Operator[] = [
   {
-    id: "op1",
-    name_th: "รถไฟฟ้า BTS",
-    name_en: "Bangkok Mass Transit System",
-    code: "BTS",
+    id: "L2",
+    operator_id: "op1",
+    name_th: "สีทอง",
+    name_en: "Gold",
+    code: "GOLD",
+    color: "#CFB53B",
+  },
+  {
+    id: "L3",
+    operator_id: "op2",
+    name_th: "สีน้ำเงิน",
+    name_en: "Blue",
+    code: "BLU",
+    color: "#1E3A8A",
   },
 ];
 
@@ -75,8 +91,9 @@ const mockStationLines: StationLine[] = [
   { station_id: "s1", line_id: "L1", sequence_order: 24 },
   { station_id: "s2", line_id: "L1", sequence_order: 28 },
   { station_id: "s3", line_id: "L1", sequence_order: 17 },
-  { station_id: "s4", line_id: "L1", sequence_order: 13 },
+  { station_id: "s4", line_id: "L3", sequence_order: 13 },
   { station_id: "s5", line_id: "L1", sequence_order: 9 },
+  { station_id: "s6", line_id: "L2", sequence_order: 2 },
 ];
 
 describe("StationPicker", () => {
@@ -86,7 +103,6 @@ describe("StationPicker", () => {
         stations={mockStations}
         lines={mockLines}
         stationLines={mockStationLines}
-        operators={mockOperators}
         label="ต้นทาง"
         value={null}
         onChange={() => {}}
@@ -101,7 +117,6 @@ describe("StationPicker", () => {
         stations={mockStations}
         lines={mockLines}
         stationLines={mockStationLines}
-        operators={mockOperators}
         label="ต้นทาง"
         value={null}
         onChange={() => {}}
@@ -116,7 +131,6 @@ describe("StationPicker", () => {
         stations={mockStations}
         lines={mockLines}
         stationLines={mockStationLines}
-        operators={mockOperators}
         label="ต้นทาง"
         value={mockStations[0]}
         onChange={() => {}}
@@ -131,7 +145,6 @@ describe("StationPicker", () => {
         stations={mockStations}
         lines={mockLines}
         stationLines={mockStationLines}
-        operators={mockOperators}
         label="ต้นทาง"
         value={null}
         onChange={() => {}}
@@ -149,7 +162,6 @@ describe("StationPicker", () => {
         stations={mockStations}
         lines={mockLines}
         stationLines={mockStationLines}
-        operators={mockOperators}
         label="ต้นทาง"
         value={null}
         onChange={() => {}}
@@ -199,5 +211,17 @@ describe("StationPicker", () => {
       target: { value: "E4" },
     });
     expect(screen.getByText("อโศก")).toBeTruthy();
+  });
+
+  it("shows line chips including GOLD and filters by selected line", () => {
+    const { getByText, getByRole, queryByText } = renderPicker();
+    fireEvent.click(getByText("ค้นหาสถานี..."));
+
+    const goldChip = getByRole("button", { name: "GOLD" });
+    expect(goldChip).toBeTruthy();
+    fireEvent.click(goldChip);
+
+    expect(getByText("เจริญนคร")).toBeTruthy();
+    expect(queryByText("อโศก")).toBeNull();
   });
 });

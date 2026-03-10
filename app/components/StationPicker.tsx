@@ -1,12 +1,11 @@
-import { useState, useMemo } from "react";
-import type { Station, Line, StationLine, Operator } from "~/lib/types";
+import { useState, useMemo, useEffect, useRef } from "react";
+import type { Station, Line, StationLine } from "~/lib/types";
 import { getAliases } from "~/lib/station-aliases";
 
 interface StationPickerProps {
   stations: Station[];
   lines: Line[];
   stationLines: StationLine[];
-  operators: Operator[];
   label: string;
   value: Station | null;
   onChange: (station: Station | null) => void;
@@ -17,7 +16,6 @@ export function StationPicker({
   stations,
   lines,
   stationLines,
-  operators,
   label,
   value,
   onChange,
@@ -25,9 +23,9 @@ export function StationPicker({
 }: StationPickerProps) {
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
-  const [selectedOperatorCode, setSelectedOperatorCode] = useState<
-    string | null
-  >(null);
+  const [selectedLineCode, setSelectedLineCode] = useState<string | null>(null);
+  const [lineHeaderTop, setLineHeaderTop] = useState(88);
+  const stickyControlsRef = useRef<HTMLDivElement | null>(null);
 
   // Build station -> lines map
   const stationLineMap = useMemo(() => {
@@ -40,18 +38,6 @@ export function StationPicker({
     }
     return map;
   }, [stationLines, lines]);
-
-  // Build operator -> lines map
-  const operatorLineMap = useMemo(() => {
-    const map = new Map<string, Line[]>();
-    for (const op of operators) {
-      map.set(
-        op.code,
-        lines.filter((l) => l.operator_id === op.id),
-      );
-    }
-    return map;
-  }, [operators, lines]);
 
   // Build line -> ordered stations map (by sequence_order)
   const lineStationsMap = useMemo(() => {
@@ -67,11 +53,18 @@ export function StationPicker({
     return map;
   }, [lines, stationLines, stations]);
 
-  // Filter lines by selected operator chip
+  const lineFilterChips = useMemo(() => {
+    const usedLineIds = new Set(stationLines.map((sl) => sl.line_id));
+    return lines
+      .filter((line) => usedLineIds.has(line.id))
+      .sort((a, b) => a.code.localeCompare(b.code));
+  }, [lines, stationLines]);
+
+  // Filter lines by selected line chip
   const visibleLines = useMemo(() => {
-    if (!selectedOperatorCode) return lines;
-    return operatorLineMap.get(selectedOperatorCode) || [];
-  }, [selectedOperatorCode, lines, operatorLineMap]);
+    if (!selectedLineCode) return lines;
+    return lines.filter((line) => line.code === selectedLineCode);
+  }, [selectedLineCode, lines]);
 
   // Grouped result (no query): sections per visible line
   const groupedSections = useMemo(() => {
@@ -88,13 +81,10 @@ export function StationPicker({
   const searchResults = useMemo(() => {
     if (!query.trim()) return null;
     const q = query.toLowerCase();
-    const candidates = selectedOperatorCode
+    const candidates = selectedLineCode
       ? stations.filter((s) => {
           const sLines = stationLineMap.get(s.id) || [];
-          return sLines.some((l) => {
-            const op = operators.find((o) => o.id === l.operator_id);
-            return op?.code === selectedOperatorCode;
-          });
+          return sLines.some((l) => l.code === selectedLineCode);
         })
       : stations;
     return candidates.filter((s) => {
@@ -111,7 +101,7 @@ export function StationPicker({
         aliases.some((alias) => alias.includes(q) || q.includes(alias))
       );
     });
-  }, [query, stations, selectedOperatorCode, stationLineMap, operators]);
+  }, [query, stations, selectedLineCode, stationLineMap]);
 
   const stationLines_ = (station: Station) =>
     stationLineMap.get(station.id) || [];
@@ -120,6 +110,27 @@ export function StationPicker({
     setIsOpen(false);
     setQuery("");
   };
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!stickyControlsRef.current) return;
+
+    const controlsEl = stickyControlsRef.current;
+    const updateTop = () => setLineHeaderTop(controlsEl.offsetHeight);
+    updateTop();
+
+    const observer =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(updateTop)
+        : null;
+    observer?.observe(controlsEl);
+    window.addEventListener("resize", updateTop);
+
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", updateTop);
+    };
+  }, [isOpen]);
 
   return (
     <div className="relative">
@@ -171,7 +182,10 @@ export function StationPicker({
           {/* Dropdown */}
           <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-80 overflow-y-auto">
             {/* Search input */}
-            <div className="sticky top-0 bg-white border-b border-gray-100 p-2 space-y-2">
+            <div
+              ref={stickyControlsRef}
+              className="sticky top-0 z-30 bg-white border-b border-gray-100 p-2 space-y-2"
+            >
               <input
                 type="text"
                 autoFocus
@@ -180,33 +194,33 @@ export function StationPicker({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
               />
-              {/* Operator filter chips */}
+              {/* Line filter chips */}
               <div className="flex gap-1 flex-wrap">
                 <button
-                  onClick={() => setSelectedOperatorCode(null)}
+                  onClick={() => setSelectedLineCode(null)}
                   className={`text-xs px-2 py-0.5 rounded-full border font-medium transition-colors ${
-                    !selectedOperatorCode
+                    !selectedLineCode
                       ? "bg-gray-800 text-white border-gray-800"
                       : "text-gray-600 border-gray-300 hover:border-gray-500"
                   }`}
                 >
                   ทั้งหมด
                 </button>
-                {operators.map((op) => (
+                {lineFilterChips.map((line) => (
                   <button
-                    key={op.id}
+                    key={line.id}
                     onClick={() =>
-                      setSelectedOperatorCode(
-                        selectedOperatorCode === op.code ? null : op.code,
+                      setSelectedLineCode(
+                        selectedLineCode === line.code ? null : line.code,
                       )
                     }
                     className={`text-xs px-2 py-0.5 rounded-full border font-medium transition-colors ${
-                      selectedOperatorCode === op.code
+                      selectedLineCode === line.code
                         ? "bg-gray-800 text-white border-gray-800"
                         : "text-gray-600 border-gray-300 hover:border-gray-500"
                     }`}
                   >
-                    {op.code}
+                    {line.code}
                   </button>
                 ))}
               </div>
@@ -238,8 +252,8 @@ export function StationPicker({
                 <div key={line.id}>
                   {/* Line header */}
                   <div
-                    className="sticky top-[88px] flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-white"
-                    style={{ backgroundColor: line.color }}
+                    className="sticky z-10 flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-white"
+                    style={{ backgroundColor: line.color, top: lineHeaderTop }}
                   >
                     <span>{line.code}</span>
                     <span>{line.name_th}</span>
