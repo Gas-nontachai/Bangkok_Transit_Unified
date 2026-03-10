@@ -29,6 +29,11 @@ interface BasePolylineEntry {
   lineId: string;
 }
 
+interface RouteStopMarker {
+  station: Station;
+  line: Line | null;
+}
+
 const DEFAULT_DESTINATION_COLOR = "#ef4444";
 const DEFAULT_ORIGIN_COLOR = "#22c55e";
 
@@ -55,6 +60,69 @@ function getLastRouteLineColor(routeSteps: PathStep[] | undefined, lines: Line[]
   return DEFAULT_DESTINATION_COLOR;
 }
 
+function getRouteStopMarkers(
+  routeSteps: PathStep[] | undefined,
+  stations: Station[],
+  lines: Line[],
+  stationLines: StationLine[],
+): RouteStopMarker[] {
+  if (!routeSteps) return [];
+
+  const stationMap = new Map(stations.map((station) => [station.id, station]));
+  const lineMap = new Map(lines.map((line) => [line.id, line]));
+  const stationLineIds = new Map<string, Set<string>>();
+  for (const stationLine of stationLines) {
+    if (!stationLineIds.has(stationLine.station_id)) {
+      stationLineIds.set(stationLine.station_id, new Set());
+    }
+    stationLineIds.get(stationLine.station_id)!.add(stationLine.line_id);
+  }
+  const seen = new Set<string>();
+  const routeStops: RouteStopMarker[] = [];
+
+  const resolveRouteStopLine = (stepIndex: number): Line | null => {
+    const step = routeSteps[stepIndex];
+    if (!step) return null;
+
+    if (step.lineId) {
+      return lineMap.get(step.lineId) ?? null;
+    }
+
+    const stationSupportedLines = stationLineIds.get(step.stationId) ?? new Set<string>();
+
+    for (let i = stepIndex + 1; i < routeSteps.length; i++) {
+      const nextStep = routeSteps[i];
+      if (nextStep.lineId && stationSupportedLines.has(nextStep.lineId)) {
+        return lineMap.get(nextStep.lineId) ?? null;
+      }
+    }
+
+    for (let i = stepIndex - 1; i >= 0; i--) {
+      const previousStep = routeSteps[i];
+      if (previousStep.lineId && stationSupportedLines.has(previousStep.lineId)) {
+        return lineMap.get(previousStep.lineId) ?? null;
+      }
+    }
+
+    const firstStationLineId = [...stationSupportedLines][0];
+    return firstStationLineId ? lineMap.get(firstStationLineId) ?? null : null;
+  };
+
+  for (let i = 0; i < routeSteps.length; i++) {
+    const step = routeSteps[i];
+    const station = stationMap.get(step.stationId);
+    if (!station || seen.has(station.id)) continue;
+
+    seen.add(station.id);
+    routeStops.push({
+      station,
+      line: resolveRouteStopLine(i),
+    });
+  }
+
+  return routeStops;
+}
+
 export function TransitMap({
   stations,
   lines,
@@ -63,8 +131,8 @@ export function TransitMap({
 }: TransitMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<unknown>(null);
-  const markersRef = useRef<unknown[]>([]);
-  const polylineRef = useRef<unknown[]>([]);
+  const backgroundMarkersRef = useRef<unknown[]>([]);
+  const routeOverlayRef = useRef<unknown[]>([]);
   const basePolylinesRef = useRef<BasePolylineEntry[]>([]);
   const supportsHover =
     typeof window !== "undefined" &&
@@ -167,7 +235,7 @@ export function TransitMap({
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         circleMarker.addTo(map as any);
-        markersRef.current.push(circleMarker);
+        backgroundMarkersRef.current.push(circleMarker);
       }
 
       // Draw route polyline if available
@@ -182,12 +250,13 @@ export function TransitMap({
       // Dim background lines when route is shown
       basePolylinesRef.current.forEach(({ polyline }) => polyline.setStyle({ opacity: 0.15 }));
 
-      // Clear existing polylines
+      // Clear existing route overlays
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      polylineRef.current.forEach((p) => (mapInstance as any).removeLayer(p));
-      polylineRef.current = [];
+      routeOverlayRef.current.forEach((layer) => (mapInstance as any).removeLayer(layer));
+      routeOverlayRef.current = [];
 
       const stationMap = new Map(stations.map((s) => [s.id, s]));
+      const routeStops = getRouteStopMarkers(routeSteps, stations, lines, stationLines);
 
       // Group steps by line segment and draw colored polylines
       let currentLineId: string | null = null;
@@ -203,7 +272,7 @@ export function TransitMap({
             weight: 6,
             opacity: 1.0,
           }).addTo(mapInstance);
-          polylineRef.current.push(polyline);
+          routeOverlayRef.current.push(polyline);
         }
       };
 
@@ -233,6 +302,42 @@ export function TransitMap({
       }
       flushPolyline();
 
+      for (const routeStop of routeStops) {
+        const markerColor = routeStop.line?.color || "#6B7280";
+        const lineName = routeStop.line?.name_th || "ไม่ทราบสาย";
+        const routeStopMarker = L.circleMarker(
+          [routeStop.station.lat, routeStop.station.lng],
+          {
+            radius: routeStop.station.is_interchange ? 8 : 6,
+            fillColor: markerColor,
+            color: "#ffffff",
+            weight: 2.5,
+            opacity: 1,
+            fillOpacity: 1,
+          },
+        );
+
+        routeStopMarker.bindPopup(
+          `<b>${routeStop.station.name_th}</b><br>${routeStop.station.name_en}<br><small>${lineName}</small>`,
+        );
+
+        if (supportsHover) {
+          routeStopMarker
+            .off("click")
+            .off("keypress")
+            .on("mouseover", () => {
+              routeStopMarker.openPopup();
+            })
+            .on("mouseout", () => {
+              routeStopMarker.closePopup();
+            });
+        }
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        routeStopMarker.addTo(mapInstance as any);
+        routeOverlayRef.current.push(routeStopMarker);
+      }
+
       const originStation = stations.find(
         (s) => s.id === routeSteps[0].stationId,
       );
@@ -260,7 +365,7 @@ export function TransitMap({
               className: "origin-tooltip",
             },
           );
-        polylineRef.current.push(m);
+        routeOverlayRef.current.push(m);
       }
 
       if (destStation) {
@@ -275,13 +380,13 @@ export function TransitMap({
           .bindTooltip(
             `<span style="color: ${destinationLineColor}; font-weight: 600;">⬤ ${destStation.name_th}</span>`,
             {
-            permanent: true,
-            direction: "top",
-            offset: [0, -8],
-            className: "destination-tooltip",
+              permanent: true,
+              direction: "top",
+              offset: [0, -8],
+              className: "destination-tooltip",
             },
           );
-        polylineRef.current.push(m);
+        routeOverlayRef.current.push(m);
       }
 
       // Fit bounds to route
@@ -294,6 +399,10 @@ export function TransitMap({
       if (routeCoords.length > 1) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (mapInstance as any).fitBounds(routeCoords, { padding: [40, 40] });
+      } else {
+        basePolylinesRef.current.forEach(({ polyline }) =>
+          polyline.setStyle({ opacity: 0.5 }),
+        );
       }
     };
 
